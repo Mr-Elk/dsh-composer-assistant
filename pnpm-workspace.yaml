@@ -1,0 +1,10 @@
+allowBuilds:
+  esbuild: true
+  '@vscode/ripgrep': true
+  node-pty: true
+  keytar: true
+  better-sqlite3: true
+
+overrides:
+  '@deepseek-ai/dsh-typert-protocol': 0.2.1-rc.3
+

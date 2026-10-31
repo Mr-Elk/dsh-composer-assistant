@@ -87,7 +87,10 @@ export function prepareGeneration(request: GenerationRequest, history: readonly 
 
 export function finishGeneration(raw: string, prepared: PreparedGeneration): string | null {
   if (typeof raw !== 'string') throw new AssistantError('OUTPUT', '模型未返回有效文字')
-  const trimmed = raw.trim()
+  // Suggestions are single-line by contract, but a model may still wrap after a
+  // sentence. Collapse the break instead of discarding an otherwise usable answer.
+  const flattened = raw.replace(/[\r\n]+[ \t]*/gu, ' ')
+  const trimmed = flattened.trim()
   if (!trimmed || trimmed === NO_SUGGESTION) {
     if (prepared.operation === 'optimize') throw new AssistantError('EMPTY_OUTPUT', '模型未返回优化文字，已保留原稿')
     return null
@@ -95,14 +98,16 @@ export function finishGeneration(raw: string, prepared: PreparedGeneration): str
   if (prepared.operation === 'optimize') {
     if (raw.includes(NO_SUGGESTION)) throw new AssistantError('OUTPUT', '模型输出不完整，已保留原稿')
     const output = restoreProtected(trimmed, prepared.protection!)
-    if (charCount(output) > prepared.config.maxDraftChars * 2) throw new AssistantError('OUTPUT', '优化结果过长，已保留原稿')
+    const targetChars = charCount(prepared.request.targetText ?? prepared.request.draft)
+    const allowed = Math.max(Math.round(targetChars * prepared.config.optimizeMaxGrowth), targetChars + 200)
+    if (charCount(output) > allowed || charCount(output) > prepared.config.maxDraftChars * 2) throw new AssistantError('OUTPUT', '优化结果过长，已保留原稿')
     return output
   }
   const cap = prepared.operation === 'next' ? prepared.config.maxNextChars : prepared.config.maxCompletionChars
-  if (charCount(raw) > cap || /[\r\n]/.test(trimmed) || /^(?:```|\{\s*"|<think>|(?:建议|预测|续写|Suggestion|Prediction)\s*[:：])/i.test(trimmed) || trimmed.includes(NO_SUGGESTION)) return null
+  if (charCount(flattened) > cap || /^(?:```|\{\s*"|<think>|(?:建议|预测|续写|Suggestion|Prediction)\s*[:：])/i.test(trimmed) || trimmed.includes(NO_SUGGESTION)) return null
   if (prepared.operation === 'next') return trimmed
-  if (trimmed.startsWith(prepared.request.draft.trim()) || prepared.request.draft.endsWith(raw)) return null
+  if (trimmed.startsWith(prepared.request.draft.trim()) || prepared.request.draft.endsWith(flattened)) return null
   // Avoid silently converting a UTF-16 fragment or an obvious cut-off sentence into a suggestion.
-  if (/[\uD800-\uDBFF]$/.test(raw) || /^[\uDC00-\uDFFF]/.test(raw)) return null
-  return raw.replace(/[ \t]+$/, '')
+  if (/[\uD800-\uDBFF]$/.test(flattened) || /^[\uDC00-\uDFFF]/.test(flattened)) return null
+  return flattened.replace(/[ \t]+$/, '')
 }

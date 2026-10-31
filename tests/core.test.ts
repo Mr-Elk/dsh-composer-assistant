@@ -81,7 +81,7 @@ describe('literal protection and prompt construction', () => {
     expect(finishGeneration(' the cache policy.', p)).toBe(' the cache policy.')
     expect(finishGeneration('Please explain the cache policy.', p)).toBeNull()
     expect(finishGeneration('a'.repeat(81), p)).toBeNull()
-    expect(finishGeneration('first\nsecond', p)).toBeNull()
+    expect(finishGeneration('first\nsecond', p)).toBe('first second')
   })
   it('rejects unsupported/invalid configuration', () => {
     expect(() => resolveConfig({ debounceMs: 0 })).toThrow()
@@ -99,6 +99,8 @@ describe('literal protection and prompt construction', () => {
     expect(() => resolveConfig({ nextTrigger: 'sometimes' as never })).toThrow(/触发时机/)
     expect(() => resolveConfig({ nextDelayMs: -1 })).toThrow(/nextDelayMs/)
     expect(resolveConfig({ nextTrigger: 'manual', nextDelayMs: 1200 })).toMatchObject({ nextTrigger: 'manual', nextDelayMs: 1200 })
+    expect(() => resolveConfig({ optimizeMaxGrowth: 0.5 })).toThrow(/optimizeMaxGrowth/)
+    expect(resolveConfig({ optimizeMaxGrowth: 1.5 }).optimizeMaxGrowth).toBe(1.5)
     const prepared = prepareGeneration(request({ operation: 'next', draft: '' }), [], resolveConfig({ extraInstruction: ' 更口语 ' }))
     expect(prepared.system).toContain('额外要求：更口语')
     expect(prepareGeneration(request({ operation: 'next', draft: '' }), [], resolveConfig()).system).not.toContain('额外要求：')
@@ -108,6 +110,13 @@ describe('literal protection and prompt construction', () => {
     expect(prepared.system).toContain(`Optimization strength: ${strength.toUpperCase()}`)
     expect(prepared.system).toContain('may not add new work or authorization')
     expect(finishGeneration(JSON.parse(prepared.input).targetText, prepared)).toBe('解释 `apiV2`，不要改文件。')
+  })
+  it('rejects an optimization that grows far beyond the target and keeps wrapped suggestions', () => {
+    const prepared = prepareGeneration(request({ draft: '解释缓存', targetText: '解释缓存' }), [], resolveConfig())
+    expect(() => finishGeneration('很长的一段改写'.repeat(200), prepared)).toThrow(/过长/)
+    expect(finishGeneration('请解释缓存失效的原因。', prepared)).toBe('请解释缓存失效的原因。')
+    const next = prepareGeneration(request({ operation: 'next', draft: '' }), [{ role: 'assistant', text: '继续吗？' }], resolveConfig())
+    expect(finishGeneration('先跑测试\n再提交', next)).toBe('先跑测试 再提交')
   })
   it('disables optimization independently without disabling suggestions', () => {
     const config = resolveConfig({ optimizeEnabled: false, stashEnabled: false })

@@ -18,4 +18,5 @@ pnpm build
 mkdir -p dist "$src/dist"
 pnpm pack --pack-destination dist >/dev/null
 cp dist/*.tgz "$src/dist/"
-echo "built: $(ls -1t "$src"/dist/*.tgz | head -1)"
+ver=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")
+echo "built: $src/dist/dsh-composer-assist-$ver.tgz"

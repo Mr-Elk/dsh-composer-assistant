@@ -30,6 +30,9 @@ function validate(config: AssistantConfig): AssistantConfig {
   if (typeof config.temperature !== 'number' || !Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
     throw new AssistantError('CONFIG', 'temperature 必须是 0 到 2 之间的数字')
   }
+  if (typeof config.optimizeMaxGrowth !== 'number' || !Number.isFinite(config.optimizeMaxGrowth) || config.optimizeMaxGrowth < 1 || config.optimizeMaxGrowth > 5) {
+    throw new AssistantError('CONFIG', 'optimizeMaxGrowth 必须是 1 到 5 之间的数字')
+  }
   if (Boolean(config.provider) !== Boolean(config.model)) throw new AssistantError('CONFIG', '固定辅助模型需同时填写提供商和模型；留空则跟随输入框')
   return config
 }

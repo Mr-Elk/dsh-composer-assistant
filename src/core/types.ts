@@ -22,13 +22,14 @@ export interface AssistantConfig {
   provider: string
   model: string
   nextDelayMs: number
+  optimizeMaxGrowth: number
   temperature: number
   reasoningEffort: string
   extraInstruction: string
 }
 export const DEFAULT_CONFIG: Readonly<AssistantConfig> = Object.freeze({
   optimizeEnabled: true, stashEnabled: true, optimizationStrength: 'standard',
-  nextEnabled: true, completionEnabled: true, displayMode: 'ghost', nextTrigger: 'auto', nextDelayMs: 0,
+  nextEnabled: true, completionEnabled: true, displayMode: 'ghost', nextTrigger: 'auto', nextDelayMs: 0, optimizeMaxGrowth: 3,
   debounceMs: 600, minIntervalMs: 2000, maxHistoryChars: 16000,
   maxDraftChars: 8000, maxNextChars: 120, maxCompletionChars: 80,
   optimizeTimeoutMs: 60000, suggestionTimeoutMs: 15000, provider: '', model: '',

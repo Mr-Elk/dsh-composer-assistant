@@ -180,3 +180,16 @@ composer 不随内容长高，`measureGhost` 只能给出光标到可见区域�
 
 验证：**120 tests passed**（手动模式零请求、延迟 500ms 后才请求）、`verify-package` PASS、
 已安装 `dsh-composer-assist@0.2.0-local.4`。
+
+## P3 第一刀：换行归一化与优化长度保护（0.2.0-local.5）
+
+两个真实的丢弃/失控点：
+
+1. 建议里只要出现换行，`finishGeneration` 就整条丢弃。模型写两句时常会在句末换行，用户看到的
+   结果因此“短了”。现在把行内换行折叠成一个空格再校验，仍拒绝多段结构与代码围栏。
+2. 优化结果的长度保护用的是 `maxDraftChars * 2`（8000 字），对“选中一句话优化”几乎永远不触发。
+   改为按目标文本计算：`max(目标字数 × optimizeMaxGrowth, 目标字数 + 200)`，超限拒绝并保留原稿。
+   `optimizeMaxGrowth` 默认 3，范围 1–5，设置页可调。
+
+验证：**121 tests passed**（换行归一化、短目标 + 超长改写被拒、倍数校验）、
+`verify-package` PASS、已安装 `dsh-composer-assist@0.2.0-local.5`。

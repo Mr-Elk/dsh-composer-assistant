@@ -127,7 +127,7 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
     {!open && state.notice && createPortal(<div ref={noticeRef} role="status" className="dsh-ia dsh-ia-notice"
       style={noticePlacement ?? { visibility: 'hidden' }} onClick={() => controller.clearNotice()}>{state.notice}</div>, document.body)}
     {open && createPortal(<div ref={menuRef} className="dsh-ia dsh-ia-menu" aria-label="输入助手" style={menuPlacement ?? { visibility: 'hidden' }}>
-      <strong>输入助手</strong><div className="dsh-ia-muted">当前会话 · 采纳后由你发送</div>
+      <div className="dsh-ia-menu-head"><strong>输入助手</strong><span className="dsh-ia-muted">采纳后由你发送</span></div>
       {state.settingsSaving && <div role="status">设置保存中…</div>}
       <div className="dsh-ia-row">
         <label><input type="checkbox" disabled={state.settingsSaving} checked={state.settings.optimizeEnabled} onChange={event => { void controller.updateSettings({ optimizeEnabled: event.target.checked }) }} />提示词优化</label>
@@ -228,7 +228,7 @@ export function AssistantOverlay({ runtime, sessionId }: OverlayProps) {
       document.removeEventListener('selectionchange', update); editor?.removeEventListener('focus', update); editor?.removeEventListener('blur', update); resize?.disconnect() }
   }, [suggestion, state.settings.displayMode])
   const ghostStyle: CSSProperties | undefined = geometry ? { left: geometry.left, top: geometry.top, width: geometry.width,
-    maxHeight: `min(3lh, ${geometry.maxHeight}px)`, font: geometry.font, lineHeight: geometry.lineHeight, letterSpacing: geometry.letterSpacing } : undefined
+    maxHeight: `${geometry.maxHeight}px`, font: geometry.font, lineHeight: geometry.lineHeight, letterSpacing: geometry.letterSpacing } : undefined
   return <span ref={anchor} className="dsh-ia" style={{ display: 'contents' }}>
     {suggestion && state.settings.displayMode === 'panel' && createPortal(<div ref={panelRef} className="dsh-ia dsh-ia-candidate" role="status"
       style={panelPlacement ?? { visibility: 'hidden' }} data-dsh-ia-visible-suggestion={panelPlacement ? '' : undefined} data-dsh-ia-session={sessionId}>
@@ -237,7 +237,7 @@ export function AssistantOverlay({ runtime, sessionId }: OverlayProps) {
     {suggestion && geometry && state.settings.displayMode === 'ghost' && <>
       {suggestion.snapshot.draft === '' && <span hidden data-dsh-ia-empty-ghost="" />}
       {createPortal(<span className="dsh-ia dsh-ia-ghost" style={ghostStyle}
-        aria-hidden="true" data-dsh-ia-visible-suggestion="" data-dsh-ia-session={sessionId}>{suggestion.text}</span>, document.body)}
+        aria-hidden="true" data-dsh-ia-visible-suggestion="" data-dsh-ia-session={sessionId}>{suggestion.text}<span className="dsh-ia-ghost-key" aria-hidden="true">Tab</span></span>, document.body)}
     </>}
   </span>
 }

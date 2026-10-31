@@ -15,6 +15,7 @@ else
   pnpm test
 fi
 pnpm build
-mkdir -p "$src/dist"
-pnpm pack --pack-destination "$src/dist" >/dev/null
+mkdir -p dist "$src/dist"
+pnpm pack --pack-destination dist >/dev/null
+cp dist/*.tgz "$src/dist/"
 echo "built: $(ls -1t "$src"/dist/*.tgz | head -1)"

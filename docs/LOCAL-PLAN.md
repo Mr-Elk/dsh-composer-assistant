@@ -100,3 +100,18 @@ dsh plugin --profile desktop add ./dist/dsh-input-assistant-<version>.tgz
 `measureGhost` 只量出光标到可见区域底部的空间，composer 不随内容长高，所以内联灰字最多显示
 一两屏以内的几行；再长就必须截断或改用候选面板。这一点要在 P1 里正面设计，而不是单纯放大
 `max-height`。
+
+## P1 第一刀（2026-10-31）
+
+- **设置页**：去掉与分区标题重复的 `<h2>`，改成「功能 / 优化 / 辅助模型 / 高级」四组行式布局；
+  开关改为 DSH 风格的轨道开关，数字字段右对齐并带范围提示，保存条固定在底部
+- **入口按钮**：去掉两个带边框的方按钮，改为无边框、悬停出底、26px 高的紧凑控件；保留
+  「优化」与「输入助手菜单」两个可访问名，测试不受影响
+- **灰字**：去掉 `min(3lh, …)` 的双重截断，改为按 `measureGhost` 量到的可见高度渲染，并在
+  末尾加一个 `Tab` 键帽提示
+- **菜单**：标题行改为左标题右说明，分区标题统一为 12px 次级色
+
+验证：116 tests passed、`pnpm build` 成功、`verify-package` PASS；
+包已装进 desktop profile（`dsh-composer-assist 0.2.0-local.0`），profile patch 里
+`input-assistant` 置 `disabled: true`，`composer-assist` 配 `maxNextChars: 300`、
+`maxCompletionChars: 200`、`suggestionTimeoutMs: 20000`。视觉待重启后由用户确认。

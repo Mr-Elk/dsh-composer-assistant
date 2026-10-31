@@ -193,3 +193,22 @@ composer 不随内容长高，`measureGhost` 只能给出光标到可见区域�
 
 验证：**121 tests passed**（换行归一化、短目标 + 超长改写被拒、倍数校验）、
 `verify-package` PASS、已安装 `dsh-composer-assist@0.2.0-local.5`。
+
+## 视觉验收（2026-10-31，local.6 / local.7）
+
+用隔离 profile 实跑 + 无头 Chrome（Playwright 1.56 的 chromium）截图，第一次真正看到渲染结果：
+
+- 浅色/深色输入框右侧：「✦ 优化 ‹」取代原来的裸文字 + 分离三角，与「工作区内修改 ‹」同一套
+  图标、字色与行高；深色下同样成立
+- 设置页：功能 / 优化 / 建议 / 辅助模型 / 高级 五组行式布局，开关是轨道开关，数字右对齐
+- 截图见 `docs/evidence/2026-10-31-composer-light.png`、`-composer-dark.png`、`-settings.png`
+
+首轮截图发现并修掉两个真问题：
+
+1. 「长度上限（倍数）」被放进了「建议」组——它属于「优化」，已移回
+2. 保存条 `position: sticky` 在设置滚动容器里盖住了「辅助模型」内容——改成内容末尾的分隔条
+
+### 一个与本次改造无关的报错
+
+无头打开时控制台有 `cannot get property "remote.session" without inject`。把副本切回**上游**
+插件（禁用 fork）复现，报错完全相同，说明是上游/无登录环境的问题，不是 fork 引入的。

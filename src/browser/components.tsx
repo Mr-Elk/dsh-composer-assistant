@@ -57,6 +57,19 @@ function useController(runtime: BrowserRuntime, sessionId: string) {
   return { controller, state }
 }
 
+
+function SparkleIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8 2.2 9.2 6l3.8 1.2-3.8 1.2L8 12.2 6.8 8.4 3 7.2 6.8 6Z" />
+  </svg>
+}
+
+function ChevronIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m4 6 4 4 4-4" />
+  </svg>
+}
+
 /** The right slot owns input observation; the overlay only paints the same controller's state. */
 export function AssistantRight({ runtime, sessionId, useInput, useSession, inputActions }: RightProps) {
   const { controller, state } = useController(runtime, sessionId)
@@ -122,8 +135,10 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
   const pure = !input.occurrences.length && !input.attachmentIds.length
   return <div className="dsh-ia dsh-ia-root" ref={anchor} data-dsh-input-assistant="">
     <button className="dsh-ia-trigger" type="button" disabled={!canOptimize || !input.draft.trim() || !state.connected}
-      onPointerDown={preserveSelection} onClick={() => { void controller.optimize() }} title="有选区时优化选区，否则优化整稿">{state.busy === 'optimize' ? '优化中…' : '优化'}</button>
-    <button type="button" aria-label="输入助手菜单" aria-expanded={open} onPointerDown={preserveSelection} onClick={() => setOpen(value => !value)}>▾</button>
+      onPointerDown={preserveSelection} onClick={() => { void controller.optimize() }} title="有选区时优化选区，否则优化整稿">
+      <SparkleIcon />{state.busy === 'optimize' ? '优化中…' : '优化'}
+    </button>
+    <button className="dsh-ia-menu-toggle" type="button" aria-label="输入助手菜单" aria-expanded={open} onPointerDown={preserveSelection} onClick={() => setOpen(value => !value)}><ChevronIcon /></button>
     {!open && state.notice && createPortal(<div ref={noticeRef} role="status" className="dsh-ia dsh-ia-notice"
       style={noticePlacement ?? { visibility: 'hidden' }} onClick={() => controller.clearNotice()}>{state.notice}</div>, document.body)}
     {open && createPortal(<div ref={menuRef} className="dsh-ia dsh-ia-menu" aria-label="输入助手" style={menuPlacement ?? { visibility: 'hidden' }}>

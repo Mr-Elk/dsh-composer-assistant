@@ -101,16 +101,16 @@ export function AssistantSettings({ runtime }: SettingsProps) {
               <option value="light">轻度润色</option><option value="standard">标准优化</option><option value="deep">深度梳理</option>
             </select></span>
           </label>
-        </div>
-      </section>
-      <section className="dsh-ia-group">
-        <h3>建议</h3>
-        <div className="dsh-ia-rows">
           <label className="dsh-ia-item">
             <span className="dsh-ia-item-main"><b>长度上限（倍数）</b><small>改写结果相对原稿的最大增长，超出即拒绝并保留原稿</small></span>
             <span className="dsh-ia-control"><input type="number" aria-label="长度上限倍数" value={form.optimizeMaxGrowth} min={1} max={5} step={0.5}
               onChange={event => change('optimizeMaxGrowth', Number(event.target.value))} /></span>
           </label>
+        </div>
+      </section>
+      <section className="dsh-ia-group">
+        <h3>建议</h3>
+        <div className="dsh-ia-rows">
           <label className="dsh-ia-item">
             <span className="dsh-ia-item-main"><b>显示方式</b><small>灰字贴着光标；超出可见高度时自动改用候选卡</small></span>
             <span className="dsh-ia-control"><select aria-label="建议显示方式" value={form.displayMode} onChange={event => change('displayMode', event.target.value as AssistantConfig['displayMode'])}>

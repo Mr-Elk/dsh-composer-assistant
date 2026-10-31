@@ -11,8 +11,10 @@ body[data-ds-dark-theme] .dsh-ia {--dsh-ia-fallback-bg:#232324;--dsh-ia-fallback
 .dsh-ia-primary:hover:not(:disabled) {filter:brightness(1.08)}
 .dsh-ia-quiet {color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted))}
 
-.dsh-ia-root {display:flex;align-items:center;gap:2px;position:relative}
-.dsh-ia-trigger {padding:0 8px}
+.dsh-ia-root {display:flex;align-items:center;gap:0;position:relative}
+.dsh-ia-trigger {padding:0 5px 0 7px;color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted))}
+.dsh-ia-menu-toggle {padding:0 4px;color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted))}
+.dsh-ia-trigger svg,.dsh-ia-menu-toggle svg {flex:0 0 auto;opacity:.85}
 
 .dsh-ia-menu {position:fixed;width:min(400px,calc(100vw - 24px));max-height:min(70dvh,640px);overflow:auto;overscroll-behavior:contain;padding:8px;border:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border));border-radius:14px;background:var(--dsw-alias-bg-layer-2,var(--dsh-ia-fallback-bg));box-shadow:0 12px 40px #0003;z-index:1000}
 .dsh-ia-menu-head {display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:6px 8px 8px}
@@ -62,6 +64,6 @@ body[data-ds-dark-theme] .dsh-ia {--dsh-ia-fallback-bg:#232324;--dsh-ia-fallback
 .dsh-ia-switch::after {content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0003;transition:transform .15s ease}
 .dsh-ia-switch:checked {background:var(--dsw-alias-state-business-primary,var(--dsh-ia-accent))}
 .dsh-ia-switch:checked::after {transform:translateX(14px)}
-.dsh-ia-settings-actions {display:flex;align-items:center;gap:10px;position:sticky;bottom:0;padding:10px 0 2px;background:linear-gradient(transparent,var(--dsw-alias-bg-layer-1,transparent) 30%)}
+.dsh-ia-settings-actions {display:flex;align-items:center;gap:10px;margin-top:4px;padding:12px 0 2px;border-top:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border))}
 .dsh-ia-settings-actions .dsh-ia-primary {padding:0 14px;min-height:30px}
 `

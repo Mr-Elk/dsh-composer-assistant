@@ -2,7 +2,7 @@
 import { useSyncExternalStore, type ComponentProps } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AssistantOverlay, AssistantRight } from '../src/browser/components'
+import { AssistantOverlay, AssistantRight, ghostOverflows } from '../src/browser/components'
 import { BrowserRuntime, type ConnectionFace } from '../src/browser/runtime'
 import { DEFAULT_CONFIG, type AssistantStatus, type GenerationRequest, type TokenSpan } from '../src/core/types'
 import type { BrowserInput } from '../src/browser/controller'
@@ -94,5 +94,12 @@ describe('composed browser surfaces', () => {
     expect(key.defaultPrevented).toBe(false)
     expect(f.insertText).not.toHaveBeenCalled()
     expect(f.runtime.controllerFor('session-ui').getSnapshot().metrics.exposures).toBe(0)
+  })
+
+  it('decides the inline/card boundary from unclipped height only', () => {
+    expect(ghostOverflows(400, 60)).toBe(true)
+    expect(ghostOverflows(60, 60)).toBe(false)
+    expect(ghostOverflows(62, 60)).toBe(true)
+    expect(ghostOverflows(400, Number.NaN)).toBe(false)
   })
 })

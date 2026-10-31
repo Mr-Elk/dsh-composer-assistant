@@ -202,16 +202,27 @@ async function copyText(text: string, controller: InputAssistantController) {
   catch { controller.notice('复制不可用，请在改动面板手动选择原文') }
 }
 
+/** A suggestion taller than the visible composer area moves to the floating card. */
+export function ghostOverflows(scrollHeight: number, maxHeight: number): boolean { return scrollHeight > maxHeight + 1 }
+
 export function AssistantOverlay({ runtime, sessionId }: OverlayProps) {
   const { controller, state } = useController(runtime, sessionId)
   const anchor = useRef<HTMLSpanElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const ghostRef = useRef<HTMLSpanElement>(null)
   const [geometry, setGeometry] = useState<GhostGeometry | null>(null)
+  const [overflow, setOverflow] = useState(false)
   const suggestion = state.suggestion
-  const panelPlacement = useFloatingPlacement(anchor, panelRef, Boolean(suggestion) && state.settings.displayMode === 'panel', true)
+  // A suggestion longer than the composer's visible area cannot render inline;
+  // fall back to the floating card instead of clipping the text.
+  const panelMode = state.settings.displayMode === 'panel' || overflow
+  const panelPlacement = useFloatingPlacement(anchor, panelRef, Boolean(suggestion) && panelMode, true)
   useEffect(() => {
-    if (suggestion && ((state.settings.displayMode === 'panel' && panelPlacement) || geometry)) controller.markExposed(suggestion.snapshot.requestId)
-  }, [controller, suggestion, geometry, panelPlacement, state.settings.displayMode])
+    if (!suggestion) setOverflow(false)
+  }, [suggestion])
+  useEffect(() => {
+    if (suggestion && ((panelMode && panelPlacement) || (!panelMode && geometry))) controller.markExposed(suggestion.snapshot.requestId)
+  }, [controller, suggestion, geometry, panelPlacement, panelMode])
   useLayoutEffect(() => {
     if (!suggestion || state.settings.displayMode !== 'ghost') { setGeometry(null); return }
     const update = () => setGeometry(measureGhost(findEditor(anchor.current), suggestion.snapshot.draft === ''))
@@ -227,16 +238,22 @@ export function AssistantOverlay({ runtime, sessionId }: OverlayProps) {
     return () => { window.removeEventListener('resize', update); window.removeEventListener('scroll', update, true)
       document.removeEventListener('selectionchange', update); editor?.removeEventListener('focus', update); editor?.removeEventListener('blur', update); resize?.disconnect() }
   }, [suggestion, state.settings.displayMode])
+  useLayoutEffect(() => {
+    if (!suggestion || state.settings.displayMode !== 'ghost' || !geometry || !ghostRef.current) return
+    // scrollHeight reflects the unclipped text; anything taller than the visible
+    // area switches to the card so the user can read the whole suggestion.
+    setOverflow(ghostOverflows(ghostRef.current.scrollHeight, geometry.maxHeight))
+  }, [suggestion, geometry, state.settings.displayMode])
   const ghostStyle: CSSProperties | undefined = geometry ? { left: geometry.left, top: geometry.top, width: geometry.width,
     maxHeight: `${geometry.maxHeight}px`, font: geometry.font, lineHeight: geometry.lineHeight, letterSpacing: geometry.letterSpacing } : undefined
   return <span ref={anchor} className="dsh-ia" style={{ display: 'contents' }}>
-    {suggestion && state.settings.displayMode === 'panel' && createPortal(<div ref={panelRef} className="dsh-ia dsh-ia-candidate" role="status"
+    {suggestion && panelMode && createPortal(<div ref={panelRef} className="dsh-ia dsh-ia-candidate" role="status"
       style={panelPlacement ?? { visibility: 'hidden' }} data-dsh-ia-visible-suggestion={panelPlacement ? '' : undefined} data-dsh-ia-session={sessionId}>
       <span className="dsh-ia-candidate-text">{suggestion.text}</span><button type="button" onPointerDown={event => event.preventDefault()} onClick={() => controller.acceptSuggestion()}>采纳</button>
       <button type="button" aria-label="忽略建议" onClick={() => controller.dismissSuggestion()}>×</button></div>, document.body)}
-    {suggestion && geometry && state.settings.displayMode === 'ghost' && <>
+    {suggestion && !panelMode && geometry && <>
       {suggestion.snapshot.draft === '' && <span hidden data-dsh-ia-empty-ghost="" />}
-      {createPortal(<span className="dsh-ia dsh-ia-ghost" style={ghostStyle}
+      {createPortal(<span ref={ghostRef} className="dsh-ia dsh-ia-ghost"  style={ghostStyle}
         aria-hidden="true" data-dsh-ia-visible-suggestion="" data-dsh-ia-session={sessionId}>{suggestion.text}<span className="dsh-ia-ghost-key" aria-hidden="true">Tab</span></span>, document.body)}
     </>}
   </span>

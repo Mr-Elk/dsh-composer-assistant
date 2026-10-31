@@ -131,3 +131,11 @@ dsh plugin --profile desktop add ./dist/dsh-input-assistant-<version>.tgz
 
 验证：typecheck 通过、**117 tests passed**、`verify-package` PASS；已覆盖安装为
 `dsh-composer-assist@0.2.0-local.1`。
+
+## P1 第二刀：灰字溢出转候选面板（0.2.0-local.2）
+
+composer 不随内容长高，`measureGhost` 只能给出光标到可见区域底部的空间。现在灰字渲染后读自身的
+`scrollHeight`，超过该空间就改用浮动候选卡（整段可读、带「采纳 / 忽略」），不再半截截断；
+判定抽成 `ghostOverflows(scrollHeight, maxHeight)`，边界与 `NaN`（不可测量）在单测里固定。
+
+验证：**118 tests passed**、`verify-package` PASS、已覆盖安装 `dsh-composer-assist@0.2.0-local.2`。

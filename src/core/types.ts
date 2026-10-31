@@ -48,6 +48,8 @@ export interface GenerationRequest extends InputSnapshot {
   lockedFragments?: readonly string[]
   provider?: string
   model?: string
+  /** Ask for a fresh suggestion for the same turn instead of reusing the accepted one. */
+  regenerate?: boolean
 }
 export interface GenerationResult {
   text: string | null

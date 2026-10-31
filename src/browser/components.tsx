@@ -168,7 +168,7 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
           <label><input type="checkbox" disabled={state.settingsSaving} checked={state.settings.completionEnabled} onChange={event => { void controller.updateSettings({ completionEnabled: event.target.checked }) }} />输入续写</label></div>
         <label>显示方式 <select aria-label="显示方式" disabled={state.settingsSaving} value={state.settings.displayMode} onChange={event => { void controller.updateSettings({ displayMode: event.target.value as 'ghost' | 'panel' }) }}>
           <option value="ghost">灰字</option><option value="panel">候选面板</option></select></label>
-        <div className="dsh-ia-row"><button type="button" onClick={() => controller.dismissSuggestion()}>暂停至下次编辑</button></div>
+        <div className="dsh-ia-row"><button type="button" onClick={() => { void controller.regenerateSuggestion() }}>换一条建议</button><button type="button" onClick={() => controller.dismissSuggestion()}>暂停至下次编辑</button></div>
       </section>
       <details className="dsh-ia-section"><summary>辅助模型设置</summary>
         <div className="dsh-ia-muted">两项留空时跟随输入框模型；辅助调用单独消耗模型用量。</div>
@@ -249,7 +249,7 @@ export function AssistantOverlay({ runtime, sessionId }: OverlayProps) {
   return <span ref={anchor} className="dsh-ia" style={{ display: 'contents' }}>
     {suggestion && panelMode && createPortal(<div ref={panelRef} className="dsh-ia dsh-ia-candidate" role="status"
       style={panelPlacement ?? { visibility: 'hidden' }} data-dsh-ia-visible-suggestion={panelPlacement ? '' : undefined} data-dsh-ia-session={sessionId}>
-      <span className="dsh-ia-candidate-text">{suggestion.text}</span><button type="button" onPointerDown={event => event.preventDefault()} onClick={() => controller.acceptSuggestion()}>采纳</button>
+      <span className="dsh-ia-candidate-text">{suggestion.text}</span><button type="button" onPointerDown={event => event.preventDefault()} onClick={() => { void controller.regenerateSuggestion() }}>换一条</button><button type="button" onPointerDown={event => event.preventDefault()} onClick={() => controller.acceptSuggestion()}>采纳</button>
       <button type="button" aria-label="忽略建议" onClick={() => controller.dismissSuggestion()}>×</button></div>, document.body)}
     {suggestion && !panelMode && geometry && <>
       {suggestion.snapshot.draft === '' && <span hidden data-dsh-ia-empty-ghost="" />}

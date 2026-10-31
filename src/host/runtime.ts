@@ -106,7 +106,7 @@ export class AssistantHostRuntime {
     const transcript = this.transcript(session)
     if (request.operation === 'next') {
       if (!settings.nextEnabled || transcript.running || request.sourceTurnId === null || request.draft.length > 0
-        || state.lastNextTurn === request.sourceTurnId) return this.result(request, null)
+        || (!request.regenerate && state.lastNextTurn === request.sourceTurnId)) return this.result(request, null)
       state.lastNextTurn = request.sourceTurnId
     } else if (request.operation === 'complete') {
       // A first-draft request and a just-started turn can both have a null

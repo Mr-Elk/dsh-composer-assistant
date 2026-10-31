@@ -139,3 +139,16 @@ composer 不随内容长高，`measureGhost` 只能给出光标到可见区域�
 判定抽成 `ghostOverflows(scrollHeight, maxHeight)`，边界与 `NaN`（不可测量）在单测里固定。
 
 验证：**118 tests passed**、`verify-package` PASS、已覆盖安装 `dsh-composer-assist@0.2.0-local.2`。
+
+## P2 第二刀：换一条（0.2.0-local.3）
+
+上游的下一句预测每个 turn 只请求一次（宿主 `state.lastNextTurn` 与浏览器 `nextTurns` 双重去重），
+用户不满意时没有第二次机会。现在：
+
+- 请求体新增 `regenerate?: boolean`，宿主见到它跳过 `lastNextTurn` 去重
+- 浏览器 `regenerateSuggestion()` 清掉 `nextCache` / 完成缓存 / 失败键与当前 turn 的去重记录，
+  按是否有草稿重新请求 `next` 或 `complete`
+- 悬浮候选卡与助手菜单各有一个入口（「换一条」/「换一条建议」）
+
+验证：**119 tests passed**（新增同 turn 二次请求用例）、`verify-package` PASS、已安装
+`dsh-composer-assist@0.2.0-local.3`。

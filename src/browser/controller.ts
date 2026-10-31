@@ -410,11 +410,26 @@ export class InputAssistantController {
     this.timerKey = cacheKey
     this.timer = setTimeout(() => { this.timer = undefined; this.timerKey = null; void this.requestSuggestion('complete') }, delay)
   }
-  private async requestSuggestion(operation: 'next' | 'complete'): Promise<void> {
+  /** Ask again for the same turn after the user rejects the current wording. */
+  regenerateSuggestion(): boolean {
+    const binding = this.binding, status = this.state.status
+    if (!binding || !status || !this.eligible()) return false
+    const route = this.routeKey(binding.route ?? status.route)
+    if (status.sourceTurnId) this.nextTurns.delete(`${status.generation}:${status.sourceTurnId}:${route}`)
+    this.nextCache = null
+    this.completionCache.clear()
+    this.failedCompletionKey = null
+    this.patch({ suggestion: null, notice: '' })
+    void this.requestSuggestion(binding.input.draft === '' ? 'next' : 'complete', true)
+    return true
+  }
+
+  private async requestSuggestion(operation: 'next' | 'complete', regenerate = false): Promise<void> {
     const binding = this.binding
     if (!binding || !this.eligible()) return
     const span = binding.actions.captureInsertion(), snapshot = this.snapshot(operation, span)
     if (!snapshot || span.start !== span.end || span.end !== binding.input.draft.length) return
+    if (regenerate) snapshot.regenerate = true
     if (operation === 'complete') this.lastCompletionStart = Date.now()
     const active = this.begin(snapshot), cacheKey = this.completionKey()
     try {

@@ -60,3 +60,24 @@ pnpm build
 pnpm pack --pack-destination dist
 dsh plugin --profile desktop add ./dist/dsh-input-assistant-<version>.tgz
 ```
+
+## P0 结果（2026-10-31）
+
+链路已跑通，全部在 APFS 临时目录执行：
+
+| 步骤 | 结果 |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | 通过，16s |
+| `pnpm typecheck` | 通过，无输出 |
+| `pnpm test` | 115 passed / 6 skipped；仅 `tests/browser-theme.test.ts` 失败，原因是本机未安装 Microsoft Edge（`channel: 'msedge'`） |
+| `pnpm build` | 通过，产出 host ESM + core ESM + `lib/client.js` |
+| `pnpm pack` | 产出 `dist/dsh-input-assistant-0.1.3.tgz`（96 KB） |
+| `node scripts/verify-package.mjs` | PASS：包内容、隔离模块工厂、host import、版本与 bundle 元数据均通过 |
+
+### 构建环境限制
+
+本仓库位于 exFAT 卷（`/Volumes/湛盘`）：pnpm 在此无法建立 store，
+`pnpm install` 直接报 `unable to open database file`。因此本地构建统一走
+`scripts/local-dev.sh` —— 把源码同步到 `/tmp/dsh-input-assistant-build` 再安装、
+校验、测试与打包，tgz 回写到仓库 `dist/`。可用 `DSH_IA_BUILD` 改临时目录，
+`SKIP_EDGE=1` 跳过依赖 Edge 的主题测试。

@@ -152,3 +152,16 @@ composer 不随内容长高，`measureGhost` 只能给出光标到可见区域�
 
 验证：**119 tests passed**（新增同 turn 二次请求用例）、`verify-package` PASS、已安装
 `dsh-composer-assist@0.2.0-local.3`。
+
+## 载入验证（2026-10-31）
+
+在不重启用户桌面实例的前提下，用隔离的 `DSH_HOME` 复制 profile 实跑了一次：
+
+- `--dump-config`：`input-assistant` 为 `disabled: true`，`composer-assist` 带着
+  `maxNextChars 300 / maxCompletionChars 200 / suggestionTimeoutMs 20000`
+- 启动 `dsh --profile verify --port 0 --no-open` 成功，boot 清单包含
+  `dsh-composer-assist/client.js`，不包含 `dsh-input-assistant`
+- 客户端包 HTTP 200，102,354 字节，SHA-256 与安装目录 `lib/client.js` 一致
+
+详见 [docs/evidence/2026-10-31-load-check.md](evidence/2026-10-31-load-check.md)。
+真实交互仍需桌面实例人工验收。

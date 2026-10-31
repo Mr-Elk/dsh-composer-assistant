@@ -3,7 +3,7 @@ import { AssistantError, DEFAULT_CONFIG, type AssistantConfig } from './types'
 const numeric: Record<string, [number, number]> = {
   debounceMs: [200, 5000], minIntervalMs: [500, 30000], maxHistoryChars: [1000, 64000],
   maxDraftChars: [100, 32000], maxNextChars: [20, 300], maxCompletionChars: [10, 200],
-  optimizeTimeoutMs: [1000, 120000], suggestionTimeoutMs: [1000, 60000],
+  optimizeTimeoutMs: [1000, 120000], suggestionTimeoutMs: [1000, 60000], nextDelayMs: [0, 30000],
 }
 const booleans = ['optimizeEnabled', 'stashEnabled', 'nextEnabled', 'completionEnabled'] as const
 const strings = ['provider', 'model', 'reasoningEffort', 'extraInstruction'] as const
@@ -14,6 +14,7 @@ function validate(config: AssistantConfig): AssistantConfig {
     if (typeof config[key] !== 'boolean') throw new AssistantError('CONFIG', `${key} 必须是布尔值`)
   }
   if (!['ghost', 'panel'].includes(config.displayMode)) throw new AssistantError('CONFIG', '显示方式必须是 ghost 或 panel')
+  if (!['auto', 'manual'].includes(config.nextTrigger)) throw new AssistantError('CONFIG', '触发时机必须是 auto 或 manual')
   if (!['light', 'standard', 'deep'].includes(config.optimizationStrength)) throw new AssistantError('CONFIG', '优化强度必须是 light、standard 或 deep')
   for (const [key, [min, max]] of Object.entries(numeric)) {
     const value = config[key as keyof AssistantConfig]

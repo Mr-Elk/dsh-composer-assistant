@@ -372,14 +372,27 @@ export class InputAssistantController {
     const turn = status.sourceTurnId
     const route = this.routeKey(binding.route ?? status.route)
     if (binding.input.draft === '') {
+      const turnKey = `${status.generation}:${turn}:${route}`
+      if (!turn || !this.state.settings.nextEnabled || this.nextTurns.has(turnKey) || this.state.settings.nextTrigger === 'manual') {
+        this.clearTimer(); return
+      }
+      const delay = this.state.settings.nextDelayMs
+      if (delay <= 0) {
+        this.clearTimer()
+        this.markNextTurn(turnKey)
+        void this.requestSuggestion('next')
+        return
+      }
+      // Keep an already armed next timer; the 900ms status poll must not reset it.
+      if (this.timer !== undefined && this.timerKey === `next:${turnKey}`) return
       this.clearTimer()
-      if (!turn) return
-      if (!this.state.settings.nextEnabled || this.nextTurns.has(`${status.generation}:${turn}:${route}`)) return
-      // Bounded like the other caches: one entry per completed turn is tiny, but a
-      // long-lived tab must not accumulate them forever.
-      if (this.nextTurns.size >= 512) this.nextTurns.clear()
-      this.nextTurns.add(`${status.generation}:${turn}:${route}`)
-      void this.requestSuggestion('next')
+      this.timerKey = `next:${turnKey}`
+      this.timer = setTimeout(() => {
+        this.timer = undefined; this.timerKey = null
+        if (!this.eligible()) return
+        this.markNextTurn(turnKey)
+        void this.requestSuggestion('next')
+      }, delay)
       return
     }
     if (!this.state.settings.completionEnabled || charCount(binding.input.draft) > this.state.settings.maxDraftChars) { this.clearTimer(); return }
@@ -410,6 +423,13 @@ export class InputAssistantController {
     this.timerKey = cacheKey
     this.timer = setTimeout(() => { this.timer = undefined; this.timerKey = null; void this.requestSuggestion('complete') }, delay)
   }
+  private markNextTurn(turnKey: string): void {
+    // Bounded like the other caches: one entry per completed turn is tiny, but a
+    // long-lived tab must not accumulate them forever.
+    if (this.nextTurns.size >= 512) this.nextTurns.clear()
+    this.nextTurns.add(turnKey)
+  }
+
   /** Ask again for the same turn after the user rejects the current wording. */
   regenerateSuggestion(): boolean {
     const binding = this.binding, status = this.state.status

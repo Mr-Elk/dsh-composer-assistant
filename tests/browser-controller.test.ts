@@ -120,6 +120,21 @@ describe('browser editor transactions', () => {
     expect(f.pending[1].request.regenerate).toBe(true)
     expect(f.controller.getSnapshot().suggestion).toBeNull()
   })
+  it('honors manual trigger and request delay for next suggestions', async () => {
+    vi.useFakeTimers()
+    const manual = fixture('', true)
+    manual.setStatus({ settings: { ...DEFAULT_CONFIG, nextEnabled: true, completionEnabled: false, nextTrigger: 'manual' } })
+    await manual.controller.refresh(); await flush()
+    expect(manual.pending).toHaveLength(0)
+
+    const delayed = fixture('', true)
+    delayed.setStatus({ settings: { ...DEFAULT_CONFIG, nextEnabled: true, completionEnabled: false, nextDelayMs: 500 } })
+    await delayed.controller.refresh(); await flush()
+    expect(delayed.pending).toHaveLength(0)
+    await vi.advanceTimersByTimeAsync(500); await flush()
+    expect(delayed.pending).toHaveLength(1)
+    expect(delayed.pending[0].request.operation).toBe('next')
+  })
   it('keeps an in-flight manual optimization alive across one failed status poll', async () => {
     const f = fixture(); await f.controller.refresh()
     const task = f.controller.optimize()

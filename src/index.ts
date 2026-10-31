@@ -11,7 +11,7 @@ import { emptyTranscript, foldTranscript, transcriptSchema } from './host/transc
 import { hostContribution, rpcPayloadSchema, type RpcPayload } from './host/rpc'
 
 export type Config = Partial<AssistantConfig>
-export const name = 'input-assistant'
+export const name = 'composer-assist'
 export const inject = ['llm', 'sessions', 'sessionProjections', 'storageDomain', 'typert', 'typertGateway']
 export const Config = schema.object({
   optimizeEnabled: schema.boolean().default(true), stashEnabled: schema.boolean().default(true),

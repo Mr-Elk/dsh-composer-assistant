@@ -81,3 +81,22 @@ dsh plugin --profile desktop add ./dist/dsh-input-assistant-<version>.tgz
 `scripts/local-dev.sh` —— 把源码同步到 `/tmp/dsh-input-assistant-build` 再安装、
 校验、测试与打包，tgz 回写到仓库 `dist/`。可用 `DSH_IA_BUILD` 改临时目录，
 `SKIP_EDGE=1` 跳过依赖 Edge 的主题测试。
+
+## 命名与版本（2026-10-31 决定）
+
+- 包名改为 `dsh-composer-assist`，版本从 `0.2.0-local.0` 起，与上游 `dsh-input-assistant` 并存
+- 同步改了模块 id、`cordis.patch.yml` 条目 id/name、`scripts/build.mjs`、`scripts/verify-package.mjs`、
+  `tests/host-package.test.ts` 与 CI 产物名
+- 内部 RPC 命名空间仍为 `input-assistant/*`，插件加载时会用 profile patch 禁用上游条目，避免两个
+  实例同时注册槽位与发起模型请求
+- 把先前打在安装包上的临时补丁（提示词放宽、`maxOutputTokens` 512/384）回收到
+  `src/core/generation.ts`，之后由源码维护
+
+验证：`SKIP_EDGE=1 scripts/local-dev.sh` → 115 passed / 1 skipped、构建成功；
+`node scripts/verify-package.mjs` → PASS（`dsh-composer-assist-0.2.0-local.0.tgz`）。
+
+### 灰字长度是物理限制
+
+`measureGhost` 只量出光标到可见区域底部的空间，composer 不随内容长高，所以内联灰字最多显示
+一两屏以内的几行；再长就必须截断或改用候选面板。这一点要在 P1 里正面设计，而不是单纯放大
+`max-height`。

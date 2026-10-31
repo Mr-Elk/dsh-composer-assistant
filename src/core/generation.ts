@@ -53,7 +53,7 @@ export function prepareGeneration(request: GenerationRequest, history: readonly 
       'Consider answering the latest question, a natural follow-up question, correcting a misunderstanding, or proceeding with an explicitly requested unfinished step.',
       'A question or correction is allowed when supported. Do not automatically propose commits, pushing, testing, or new features just because code was produced.',
       `If no single continuation is well-supported, or the task is naturally finished, output ${NO_SUGGESTION}. Do not guess an unresolved choice.`,
-      `Return one short message of at most ${config.maxNextChars} characters.`,
+      `Return one complete message the user would send, at most ${config.maxNextChars} characters. Prefer one or two sentences when the context supports it; do not pad, repeat the draft, or invent new requirements.`,
       'Examples: user requested hit rate AND invalidation, only hit rate was explained -> 再解释一下缓存失效。',
       'User said explanation only, assistant proposes file edits -> 先不要改文件，请只解释原因。',
       `Assistant asks Redis or local cache, no preference in history -> ${NO_SUGGESTION}.`,
@@ -79,7 +79,7 @@ export function prepareGeneration(request: GenerationRequest, history: readonly 
   return {
     operation: request.operation, system, input, request, config, protection,
     timeoutMs: request.operation === 'optimize' ? config.optimizeTimeoutMs : config.suggestionTimeoutMs,
-    maxOutputTokens: request.operation === 'optimize' ? 8192 : request.operation === 'next' ? 256 : 192,
+    maxOutputTokens: request.operation === 'optimize' ? 8192 : request.operation === 'next' ? 512 : 384,
   }
 }
 

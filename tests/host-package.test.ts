@@ -37,7 +37,7 @@ class PersistentFixtureMedium extends Service {
 }
 
 const releaseVersion = JSON.parse(await readFile(resolve('package.json'), 'utf8')).version
-const archive = resolve(`dist/dsh-input-assistant-${releaseVersion}.tgz`)
+const archive = resolve(`dist/dsh-composer-assist-${releaseVersion}.tgz`)
 const parent = resolve('.test-runtime')
 let extraction: string | undefined
 let ctx: Context | undefined
@@ -80,7 +80,7 @@ describe.skipIf(!existsSync(archive))('published .tgz through the official Loade
     const pkg = JSON.parse(await readFile(resolve(packedRoot, 'package.json'), 'utf8'))
     expect(pkg.engines.dsh).toBe('>=0.2.1-rc.2 <0.3.0-0')
     const patch = await readFile(resolve(packedRoot, 'cordis.patch.yml'), 'utf8')
-    expect(patch).toContain('name: dsh-input-assistant')
+    expect(patch).toContain('name: dsh-composer-assist')
     ctx = new Context()
     new TypertRegistry(ctx)
     new SessionStore(ctx)

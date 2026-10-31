@@ -212,3 +212,16 @@ composer 不随内容长高，`measureGhost` 只能给出光标到可见区域�
 
 无头打开时控制台有 `cannot get property "remote.session" without inject`。把副本切回**上游**
 插件（禁用 fork）复现，报错完全相同，说明是上游/无登录环境的问题，不是 fork 引入的。
+
+## 竞态修复（0.2.0-local.8）
+
+代码复盘发现两处会“白花一次请求”的竞态，都已修并有单测：
+
+1. **延迟窗口内开始打字**：`nextDelayMs` 到点时用户已经在输入，定时器仍会发 `next`；宿主因
+   `draft.length > 0` 直接返回 null，同时该轮被标记为已请求，这一轮的建议就没了。现在到点先检查
+   `binding.input.draft === ''`，不满足就静默放弃，不消耗该轮。
+2. **换一条后轮询重复请求**：`regenerateSuggestion()` 清了 `nextTurns` 再去请求，但没有重新标记；
+   等这次请求结束，900ms 的状态轮询会再发一次。现在发起时就把它标记为已请求。
+
+验证：**122 tests passed**（新增“打字后延迟请求被丢弃”“换一条后轮询不再请求”）、
+`verify-package` PASS、已安装 `dsh-composer-assist@0.2.0-local.8`。

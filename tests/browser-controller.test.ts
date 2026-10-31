@@ -119,6 +119,20 @@ describe('browser editor transactions', () => {
     expect(f.pending).toHaveLength(2)
     expect(f.pending[1].request.regenerate).toBe(true)
     expect(f.controller.getSnapshot().suggestion).toBeNull()
+    f.resolve(1, '第二条建议'); await flush()
+    await f.controller.refresh(); await flush()
+    // The regenerated turn is already marked, so polling must not request again.
+    expect(f.pending).toHaveLength(2)
+  })
+  it('drops a delayed next request when the draft changed first', async () => {
+    vi.useFakeTimers()
+    const f = fixture('', true)
+    f.setStatus({ settings: { ...DEFAULT_CONFIG, nextEnabled: true, completionEnabled: false, nextDelayMs: 500 } })
+    await f.controller.refresh(); await flush()
+    expect(f.pending).toHaveLength(0)
+    f.update('已经开始打字')
+    await vi.advanceTimersByTimeAsync(500); await flush()
+    expect(f.pending).toHaveLength(0)
   })
   it('honors manual trigger and request delay for next suggestions', async () => {
     vi.useFakeTimers()

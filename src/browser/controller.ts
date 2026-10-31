@@ -389,7 +389,9 @@ export class InputAssistantController {
       this.timerKey = `next:${turnKey}`
       this.timer = setTimeout(() => {
         this.timer = undefined; this.timerKey = null
-        if (!this.eligible()) return
+        // The user may have started typing inside the delay window; a next-turn
+        // request would be rejected by the host and would burn the turn.
+        if (!this.eligible() || this.binding?.input.draft !== '') return
         this.markNextTurn(turnKey)
         void this.requestSuggestion('next')
       }, delay)
@@ -440,7 +442,9 @@ export class InputAssistantController {
     this.completionCache.clear()
     this.failedCompletionKey = null
     this.patch({ suggestion: null, notice: '' })
-    void this.requestSuggestion(binding.input.draft === '' ? 'next' : 'complete', true)
+    const empty = binding.input.draft === ''
+    if (empty && status.sourceTurnId) this.markNextTurn(`${status.generation}:${status.sourceTurnId}:${route}`)
+    void this.requestSuggestion(empty ? 'next' : 'complete', true)
     return true
   }
 

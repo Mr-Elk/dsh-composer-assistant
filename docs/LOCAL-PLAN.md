@@ -225,3 +225,23 @@ composer 不随内容长高，`measureGhost` 只能给出光标到可见区域�
 
 验证：**122 tests passed**（新增“打字后延迟请求被丢弃”“换一条后轮询不再请求”）、
 `verify-package` PASS、已安装 `dsh-composer-assist@0.2.0-local.8`。
+
+## 真实浏览器验收：灰字、溢出转卡、Tab 采纳（0.2.0-local.9）
+
+在隔离实例里用 Playwright 拦截 `/api/input-assistant/call` 的 `generate`，返回固定建议，
+绕开无登录环境，第一次驱动了真实 composer：
+
+| 场景 | 结果 |
+| --- | --- |
+| 草稿中加入短建议 | 灰字贴着光标渲染，行高/基线一致，末尾有 `Tab` 键帽（`docs/evidence/2026-10-31-ghost.png`） |
+| 超长建议 | 灰字不渲染，自动切到浮动候选卡 |
+| 按 Tab | **原本无效**：输入框文本不变、灰字不消失 |
+
+Tab 失效的根因：监听挂在 `window` 冒泡阶段，而 composer 的 Lexical keymap 在编辑器元素上先
+处理并消费了 Tab。改为捕获阶段监听（`addEventListener('keydown', keyDown, true)`），仍由
+`canUseTab` 让路给 `/` `@` 的菜单、IME 组字与修饰键。
+
+修复后同一脚本验证：按 Tab 后灰字消失，输入框文本变为
+`这段代码的时间复杂度是，最坏 O(n log n)。`，一次插入。
+
+这是单测发现不了、只有真实浏览器才暴露的问题；`docs/evidence/` 里留了灰字截图。

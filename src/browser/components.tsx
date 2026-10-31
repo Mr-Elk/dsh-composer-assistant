@@ -111,14 +111,16 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
     editor.addEventListener('blur', selectionChanged)
     editor.addEventListener('compositionstart', compositionStart)
     editor.addEventListener('compositionend', compositionEnd)
-    window.addEventListener('keydown', keyDown)
+    // Capture phase: the composer's Lexical keymap runs on the editor element and
+    // would otherwise consume Tab before this handler sees it.
+    window.addEventListener('keydown', keyDown, true)
     return () => {
       document.removeEventListener('selectionchange', selectionChanged)
       editor.removeEventListener('focus', selectionChanged)
       editor.removeEventListener('blur', selectionChanged)
       editor.removeEventListener('compositionstart', compositionStart)
       editor.removeEventListener('compositionend', compositionEnd)
-      window.removeEventListener('keydown', keyDown)
+      window.removeEventListener('keydown', keyDown, true)
     }
   }, [controller, sessionId])
   useEffect(() => {

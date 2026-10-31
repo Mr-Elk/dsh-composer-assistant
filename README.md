@@ -3,6 +3,39 @@
 [![CI](https://github.com/Somnus678/dsh-input-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/Somnus678/dsh-input-assistant/actions/workflows/ci.yml)
 [![release](https://img.shields.io/badge/release-v0.1.3-blue)](https://github.com/Somnus678/dsh-input-assistant/releases/tag/v0.1.3)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+> **本地 fork**：本仓库是 [Somnus678/dsh-input-assistant](https://github.com/Somnus678/dsh-input-assistant)
+> 的本地改造版本，包名改为 `dsh-composer-assist`，不向上游发布；原项目的版权与 MIT 许可归原作者。
+> 改造范围、决策与验收记录见 [docs/LOCAL-PLAN.md](docs/LOCAL-PLAN.md)。
+
+## 本地 fork 与上游 0.1.3 的差异
+
+| 方面 | 上游 0.1.3 | 本 fork（0.2.0-local.10） |
+| --- | --- | --- |
+| 入口按钮 | 裸文字「优化」+ 分离的 ▾ | ✦ 图标 + 文字 + chevron，与工具条同一套 |
+| 灰字 | 固定 `max-height: 3lh` 截断 | 按可见高度渲染；放不下自动切候选卡 |
+| 设置页 | `<h2>` + 大块 fieldset | 五组行式布局、轨道开关、底部保存条 |
+| 菜单 | 原生复选框 | 轨道开关 + 行式布局 |
+| 设置项 | 4 开关 + 2 下拉 + 8 个数字 | 另加温度、推理档、额外指令、触发时机、请求延迟、优化长度倍数 |
+| 建议 | 每轮一次；含换行整条丢弃 | 可「换一条」；换行折叠为空格；触发时机与延迟可配 |
+| 优化 | 长度保护实际是 8000 字 | 按目标文本 × 倍数限幅 |
+
+## 本地构建、安装与回退
+
+```shell
+./scripts/local-dev.sh                                  # exFAT 卷上无法跑 pnpm，脚本会在 APFS 临时目录构建并回写 dist/
+dsh plugin --profile desktop add ./dist/dsh-composer-assist-<version>.tgz
+```
+
+本 fork 与上游并存：在 profile 的 `cordis.patch.yml` 里把 `input-assistant` 置 `disabled: true`，
+只启用本地版本。回退只需移除 `dsh-composer-assist`、去掉该 `disabled`，然后重启 DSH。
+
+## 已知限制
+
+- 灰字只能在 composer 的可见区域内渲染，更长的建议一律走候选卡
+- IME 组字期间不发请求，但该路径目前只有 jsdom 单测覆盖，真实中文输入法仍需人工确认
+- 上游 2026-10-24 后无提交；同步用 `git fetch upstream && git rebase upstream/main`，
+  本地改动集中在 `local/0.2` 分支
 [![dsh](https://img.shields.io/badge/DSH-0.2.1--rc.2-purple)](https://github.com/deepseek-ai/deepseek-harness)
 [![tests](https://img.shields.io/badge/tests-121%20passed-brightgreen)](docs/validation.md)
 

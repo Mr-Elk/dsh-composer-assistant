@@ -121,7 +121,21 @@ export function AssistantSettings({ runtime }: SettingsProps) {
             <span className="dsh-ia-item-main"><b>模型</b></span>
             <span className="dsh-ia-control"><input type="text" value={form.model} onChange={event => change('model', event.target.value)} placeholder="跟随输入框" maxLength={200} autoComplete="off" /></span>
           </label>
+          <label className="dsh-ia-item">
+            <span className="dsh-ia-item-main"><b>温度</b><small>0 更稳定，1 更多变化；建议 0.3–0.8</small></span>
+            <span className="dsh-ia-control"><input type="number" aria-label="温度" value={form.temperature} min={0} max={2} step={0.1}
+              onChange={event => change('temperature', Number(event.target.value))} /></span>
+          </label>
+          <label className="dsh-ia-item">
+            <span className="dsh-ia-item-main"><b>推理档</b><small>留空自动取该模型最低档；也可填模型声明过的档位 id</small></span>
+            <span className="dsh-ia-control"><input type="text" aria-label="推理档" value={form.reasoningEffort} onChange={event => change('reasoningEffort', event.target.value)} placeholder="自动（最低档）" maxLength={200} autoComplete="off" /></span>
+          </label>
         </div>
+        <label className="dsh-ia-field">
+          <span>额外指令（追加到系统提示词，最多 500 字）</span>
+          <textarea value={form.extraInstruction} maxLength={500} rows={3} placeholder="例如：用更口语的中文；不要出现列表；优先给出下一步验证"
+            onChange={event => change('extraInstruction', event.target.value)} />
+        </label>
       </section>
       <section className="dsh-ia-group">
         <h3>高级</h3>

@@ -115,3 +115,19 @@ dsh plugin --profile desktop add ./dist/dsh-input-assistant-<version>.tgz
 包已装进 desktop profile（`dsh-composer-assist 0.2.0-local.0`），profile patch 里
 `input-assistant` 置 `disabled: true`，`composer-assist` 配 `maxNextChars: 300`、
 `maxCompletionChars: 200`、`suggestionTimeoutMs: 20000`。视觉待重启后由用户确认。
+
+## P2 第一刀（2026-10-31，0.2.0-local.1）
+
+设置里补了三项直接影响输出质量的旋钮，原先只能在代码里改：
+
+| 键 | 默认 | 作用 |
+| --- | --- | --- |
+| `temperature` | 0.7 | 传给 `llm.prepareCall` 的采样温度，0 更稳定、1 更多变化 |
+| `reasoningEffort` | 空 | 空 = 取该模型声明的最低档；填了且模型支持则用该档 |
+| `extraInstruction` | 空 | 追加到系统提示词末尾的「额外要求」，上限 500 字 |
+
+`reasoningEffort` 只在该模型声明过该档位时才生效，否则回落到最低档，避免把不认识的档位发给
+适配器。`extraInstruction` 在三种操作（优化/预测/续写）里都会追加，设置页有独立文本域。
+
+验证：typecheck 通过、**117 tests passed**、`verify-package` PASS；已覆盖安装为
+`dsh-composer-assist@0.2.0-local.1`。

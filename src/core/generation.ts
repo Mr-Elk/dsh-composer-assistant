@@ -69,6 +69,8 @@ export function prepareGeneration(request: GenerationRequest, history: readonly 
       `Draft Please explain the cause without editing files. -> ${NO_SUGGESTION}.`,
     ].join('\n')
   }
+  const extra = config.extraInstruction.trim()
+  if (extra) system += '\n' + `额外要求：${extra}`
   const surrounding = request.operation === 'optimize' && request.targetText !== undefined && request.targetText !== request.draft
     ? Array.from(request.draft).slice(0, config.maxDraftChars).join('') : undefined
   const input = JSON.stringify({

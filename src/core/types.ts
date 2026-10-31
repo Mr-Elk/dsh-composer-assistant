@@ -20,6 +20,9 @@ export interface AssistantConfig {
   suggestionTimeoutMs: number
   provider: string
   model: string
+  temperature: number
+  reasoningEffort: string
+  extraInstruction: string
 }
 export const DEFAULT_CONFIG: Readonly<AssistantConfig> = Object.freeze({
   optimizeEnabled: true, stashEnabled: true, optimizationStrength: 'standard',
@@ -27,6 +30,7 @@ export const DEFAULT_CONFIG: Readonly<AssistantConfig> = Object.freeze({
   debounceMs: 600, minIntervalMs: 2000, maxHistoryChars: 16000,
   maxDraftChars: 8000, maxNextChars: 120, maxCompletionChars: 80,
   optimizeTimeoutMs: 60000, suggestionTimeoutMs: 15000, provider: '', model: '',
+  temperature: 0.7, reasoningEffort: '', extraInstruction: '',
 })
 export interface InputSnapshot {
   requestId: string

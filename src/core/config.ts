@@ -6,7 +6,7 @@ const numeric: Record<string, [number, number]> = {
   optimizeTimeoutMs: [1000, 120000], suggestionTimeoutMs: [1000, 60000],
 }
 const booleans = ['optimizeEnabled', 'stashEnabled', 'nextEnabled', 'completionEnabled'] as const
-const strings = ['provider', 'model'] as const
+const strings = ['provider', 'model', 'reasoningEffort', 'extraInstruction'] as const
 
 /** Validate one already-merged config object; throws with the first problem found. */
 function validate(config: AssistantConfig): AssistantConfig {
@@ -22,8 +22,12 @@ function validate(config: AssistantConfig): AssistantConfig {
     }
   }
   for (const key of strings) {
-    if (typeof config[key] !== 'string' || config[key].length > 200) throw new AssistantError('CONFIG', `${key} 无效`)
+    const limit = key === 'extraInstruction' ? 500 : 200
+    if (typeof config[key] !== 'string' || config[key].length > limit) throw new AssistantError('CONFIG', `${key} 无效`)
     config[key] = config[key].trim()
+  }
+  if (typeof config.temperature !== 'number' || !Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
+    throw new AssistantError('CONFIG', 'temperature 必须是 0 到 2 之间的数字')
   }
   if (Boolean(config.provider) !== Boolean(config.model)) throw new AssistantError('CONFIG', '固定辅助模型需同时填写提供商和模型；留空则跟随输入框')
   return config

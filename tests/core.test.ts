@@ -91,6 +91,15 @@ describe('literal protection and prompt construction', () => {
     expect(() => resolveConfig({ optimizationStrength: 'unsafe' as never })).toThrow(/优化强度/)
     expect(() => resolveConfig({ optimizeEnabled: 'yes' as never })).toThrow(/布尔值/)
   })
+  it('validates sampling settings and appends a bounded extra instruction', () => {
+    expect(() => resolveConfig({ temperature: 2.1 })).toThrow(/temperature/)
+    expect(() => resolveConfig({ temperature: Number.NaN })).toThrow(/temperature/)
+    expect(() => resolveConfig({ extraInstruction: 'x'.repeat(501) })).toThrow(/extraInstruction/)
+    expect(resolveConfig({ temperature: 0.2, reasoningEffort: '  low  ' })).toMatchObject({ temperature: 0.2, reasoningEffort: 'low' })
+    const prepared = prepareGeneration(request({ operation: 'next', draft: '' }), [], resolveConfig({ extraInstruction: ' 更口语 ' }))
+    expect(prepared.system).toContain('额外要求：更口语')
+    expect(prepareGeneration(request({ operation: 'next', draft: '' }), [], resolveConfig()).system).not.toContain('额外要求：')
+  })
   it.each(['light', 'standard', 'deep'] as const)('uses the %s optimization policy while preserving scope and protected fragments', strength => {
     const prepared = prepareGeneration(request({ draft: '解释 `apiV2`，不要改文件。' }), [], resolveConfig({ optimizationStrength: strength }))
     expect(prepared.system).toContain(`Optimization strength: ${strength.toUpperCase()}`)

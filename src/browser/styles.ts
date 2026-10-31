@@ -25,7 +25,8 @@ body[data-ds-dark-theme] .dsh-ia {--dsh-ia-fallback-bg:#232324;--dsh-ia-fallback
 .dsh-ia-row label {display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:7px}
 .dsh-ia-field {display:flex;flex-direction:column;gap:5px;margin:6px 4px;font-size:12px;color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted))}
 .dsh-ia-field input,.dsh-ia-field select,.dsh-ia select {min-height:26px;border:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border));border-radius:8px;background:var(--dsw-alias-bg-layer-1,var(--dsh-ia-fallback-bg));padding:0 8px;color:var(--dsw-alias-label-primary,var(--dsh-ia-fallback-fg))}
-.dsh-ia-field input {width:100%}
+.dsh-ia-field input,.dsh-ia-field textarea {width:100%}
+.dsh-ia-field textarea {border:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border));border-radius:8px;background:var(--dsw-alias-bg-layer-1,var(--dsh-ia-fallback-bg));padding:7px 9px;resize:vertical;min-height:64px;color:var(--dsw-alias-label-primary,var(--dsh-ia-fallback-fg))}
 .dsh-ia-muted {color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted));font-size:12px;margin:0;padding:0 4px}
 
 .dsh-ia-notice {position:fixed;max-width:calc(100vw - 24px);overflow:auto;padding:8px 11px;border:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border));border-radius:10px;background:var(--dsw-alias-bg-layer-2,var(--dsh-ia-fallback-bg));box-shadow:0 6px 24px #0002;z-index:999}

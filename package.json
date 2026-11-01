@@ -73,7 +73,9 @@
     "test:web": "node scripts/smoke-web.mjs",
     "eval:validate": "node scripts/evaluate.mjs validate",
     "eval:export": "node scripts/evaluate.mjs export",
-    "eval:score": "node scripts/evaluate.mjs score"
+    "eval:score": "node scripts/evaluate.mjs score",
+    "publish:check": "node scripts/verify-publish.mjs",
+    "prepublishOnly": "node scripts/verify-publish.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.5",

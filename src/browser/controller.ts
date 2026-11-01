@@ -75,6 +75,8 @@ export class InputAssistantController {
   private failedCompletionKey: string | null = null
   private lastCompletionStart = -Infinity
   private suppressUntilEdit: string | null = null
+  private noticeTimer: ReturnType<typeof setTimeout> | undefined
+  private noticeTtl = 6000
   private sequence = 0
   private clientGeneration: string | null = null
   private lockedRanges: { text: string; span: TokenSpan }[] = []
@@ -89,8 +91,33 @@ export class InputAssistantController {
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
   private patch(update: Partial<BrowserState>): void {
     if (this.disposed) return
+    const previousNotice = this.state.notice
     this.state = { ...this.state, ...update }
+    if (this.state.notice !== previousNotice) this.armNoticeTimer()
     for (const listener of this.listeners) listener()
+  }
+
+  /** A notice is transient: info hides after 6s, errors linger for 10s. */
+  private armNoticeTimer(): void {
+    this.clearNoticeTimer()
+    if (!this.state.notice) { this.noticeTtl = 6000; return }
+    const ttl = this.noticeTtl
+    this.noticeTtl = 6000
+    this.noticeTimer = setTimeout(() => {
+      this.noticeTimer = undefined
+      if (!this.disposed) this.patch({ notice: '' })
+    }, ttl)
+  }
+
+  private clearNoticeTimer(): void {
+    if (this.noticeTimer === undefined) return
+    clearTimeout(this.noticeTimer)
+    this.noticeTimer = undefined
+  }
+
+  private errorNotice(error: unknown): void {
+    this.noticeTtl = 10000
+    this.patch({ notice: this.errorMessage(error) })
   }
 
   start(): void {
@@ -103,6 +130,7 @@ export class InputAssistantController {
     if (this.disposed) return
     this.cancelActive()
     this.clearTimer()
+    this.clearNoticeTimer()
     clearInterval(this.poll)
     this.lifecycle.abort()
     this.disposed = true
@@ -180,7 +208,7 @@ export class InputAssistantController {
     if (this.settingsPending) return
     if (this.saveSettings) {
       try { await this.saveSettings(update); this.patch({ notice: '设置已保存' }) }
-      catch (error) { this.patch({ notice: this.errorMessage(error) }) }
+      catch (error) { this.errorNotice(error) }
       return
     }
     this.beginSettingsUpdate()
@@ -188,7 +216,7 @@ export class InputAssistantController {
       const settings = await this.transport.call<AssistantConfig>('settings/set', update, this.lifecycle.signal)
       this.applySettings(settings)
       this.patch({ notice: '设置已保存' })
-    } catch (error) { this.patch({ notice: this.errorMessage(error) }) }
+    } catch (error) { this.errorNotice(error) }
     finally { this.endSettingsUpdate() }
   }
   beginSettingsUpdate(): void { this.settingsEpoch++; this.settingsPending = true; this.invalidate(false); this.patch({ settingsSaving: true }) }
@@ -242,7 +270,7 @@ export class InputAssistantController {
         connectionGeneration: snapshot.connectionGeneration, routeKey: snapshot.routeKey,
         clientGeneration: active.clientGeneration }, notice: '已优化，可查看改动或撤销' })
     } catch (error) {
-      if (!active.controller.signal.aborted) this.patch({ notice: this.errorMessage(error) })
+      if (!active.controller.signal.aborted) this.errorNotice(error)
     } finally {
       this.recordLatency(active)
       if (this.active === active) { this.active = null; this.patch({ busy: null }) }
@@ -297,7 +325,7 @@ export class InputAssistantController {
     if (generation === null) return
     try { const drafts = await this.transport.call<StoredDraft[]>('drafts/list', { sessionId: this.sessionId }, this.lifecycle.signal)
       if (generation === this.transport.generation()) this.patch({ drafts }) }
-    catch (error) { if (!this.lifecycle.signal.aborted) this.patch({ notice: this.errorMessage(error) }) }
+    catch (error) { if (!this.lifecycle.signal.aborted) this.errorNotice(error) }
   }
   async stash(replaceId?: string): Promise<void> {
     if (this.settingsPending) return
@@ -319,7 +347,7 @@ export class InputAssistantController {
         }
       }
       this.patch({ notice: '已保存快照；当前状态已变化，保留当前输入' })
-    } catch (error) { this.patch({ notice: this.errorMessage(error) }) }
+    } catch (error) { this.errorNotice(error) }
     finally { this.patch({ busy: null }) }
   }
   restoreDraft(draft: StoredDraft, mode: 'append' | 'replace'): boolean {
@@ -339,7 +367,7 @@ export class InputAssistantController {
   async clearDrafts(): Promise<void> { await this.mutateDraft('drafts/clear', { sessionId: this.sessionId }) }
   private async mutateDraft(method: string, data: unknown): Promise<void> {
     try { await this.transport.call(method, data, this.lifecycle.signal); await this.refreshDrafts() }
-    catch (error) { this.patch({ notice: this.errorMessage(error) }) }
+    catch (error) { this.errorNotice(error) }
   }
 
   private captureTarget(requireSelection: boolean): { text: string; span: TokenSpan; clipboardStart: number; clipboardEnd: number } | null {

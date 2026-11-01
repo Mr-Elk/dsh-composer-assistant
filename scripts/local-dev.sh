@@ -16,6 +16,7 @@ else
 fi
 pnpm build
 mkdir -p dist "$src/dist"
+rm -f dist/*.tgz
 pnpm pack --pack-destination dist >/dev/null
 cp dist/*.tgz "$src/dist/"
 ver=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")

@@ -125,6 +125,7 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
     const compositionStart = () => controller.setComposing(true)
     const compositionEnd = () => controller.setComposing(false)
     const keyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && controller.getSnapshot().notice) { controller.clearNotice(); return }
       if (!controller.getSnapshot().suggestion || !canUseTab(event, editor, false)) return
       if (![...document.querySelectorAll('[data-dsh-ia-visible-suggestion]')].some(node => node.getAttribute('data-dsh-ia-session') === sessionId)) return
       if (controller.acceptSuggestion()) event.preventDefault()

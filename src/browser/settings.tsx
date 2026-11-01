@@ -65,7 +65,7 @@ export function AssistantSettings({ runtime }: SettingsProps) {
     {loading && <p role="status">正在加载设置…</p>}
     {message && <p role="status">{message}</p>}
     {error && <p role="alert">{error}</p>}
-    <fieldset disabled={loading || saving || generation === null || !accepted} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+    <fieldset className="dsh-ia-settings-fieldset" disabled={loading || saving || generation === null || !accepted}>
       <section className="dsh-ia-group">
         <h3>功能</h3>
         <div className="dsh-ia-rows">
@@ -102,7 +102,7 @@ export function AssistantSettings({ runtime }: SettingsProps) {
       </section>
       <section className="dsh-ia-group">
         <h3>辅助模型</h3>
-        <p className="dsh-ia-muted">两项同时留空时跟随输入框模型。辅助调用单独消耗模型用量。</p>
+        <p className="dsh-ia-group-note">两项同时留空时跟随输入框模型；辅助调用单独消耗模型用量。</p>
         <div className="dsh-ia-rows">
           <Row title="提供商"><input type="text" aria-label="提供商" value={form.provider} onChange={event => change('provider', event.target.value)} placeholder="跟随输入框" maxLength={200} autoComplete="off" /></Row>
           <Row title="模型"><input type="text" aria-label="模型" value={form.model} onChange={event => change('model', event.target.value)} placeholder="跟随输入框" maxLength={200} autoComplete="off" /></Row>

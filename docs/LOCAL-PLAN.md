@@ -257,3 +257,19 @@ Tab 失效的根因：监听挂在 `window` 冒泡阶段，而 composer 的 Lexi
 截图见 `docs/evidence/2026-10-31-menu.png`。
 
 验证：typecheck 通过、122 tests passed、已安装 `dsh-composer-assist@0.2.0-local.10`。
+
+## 提示气泡不再遮挡输入框（0.2.0-local.12）
+
+用户反馈：优化完成后的「已优化，可查看改动或撤销」气泡浮在输入框内部，挡住草稿第一行。
+
+原因：气泡沿用 `useFloatingPlacement(anchor, …)`，锚点是工具条右侧的插件按钮（位于 composer 内部），
+所以它被放在按钮上方 —— 也就是输入框里。
+
+修复：新增 `useAboveCard(anchor)`，改用 `[data-composer-card]` 的边界计算 `bottom/right`，
+气泡固定贴在**卡片上沿外 8px、右对齐卡片右缘**；通过 `ResizeObserver`、`resize` 与 `scroll`
+跟随卡片高度变化。宽度改为 `max-content`（上限 440px），短消息不再撑成一整条。
+
+实测：气泡 `top 398 / bottom 435`，卡片 `top 443`，右缘同为 `1133` —— 与卡片无重叠。
+截图 `docs/evidence/2026-11-01-notice.png`。
+
+验证：122 tests passed、`verify-package` PASS、已安装 `0.2.0-local.12`。

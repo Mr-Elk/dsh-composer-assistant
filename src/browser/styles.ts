@@ -35,7 +35,7 @@ body[data-ds-dark-theme] .dsh-ia {--dsh-ia-fallback-bg:#232324;--dsh-ia-fallback
 .dsh-ia-field textarea {border:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border));border-radius:8px;background:var(--dsw-alias-bg-layer-1,var(--dsh-ia-fallback-bg));padding:7px 9px;resize:vertical;min-height:64px;color:var(--dsw-alias-label-primary,var(--dsh-ia-fallback-fg))}
 .dsh-ia-muted {color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted));font-size:12px;margin:0;padding:0 4px}
 
-.dsh-ia-notice {position:fixed;max-width:calc(100vw - 24px);overflow:auto;padding:8px 11px;border:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border));border-radius:10px;background:var(--dsw-alias-bg-layer-2,var(--dsh-ia-fallback-bg));box-shadow:0 6px 24px #0002;z-index:999}
+.dsh-ia-notice {position:fixed;right:12px;width:max-content;max-width:min(440px,calc(100vw - 24px));overflow:auto;padding:8px 11px;border:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border));border-radius:10px;background:var(--dsw-alias-bg-layer-2,var(--dsh-ia-fallback-bg));box-shadow:0 6px 24px #0002;z-index:999}
 .dsh-ia-menu .dsh-ia-notice {position:static;max-width:100%;margin:6px 4px;box-shadow:none}
 .dsh-ia-pre {white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:12px;max-height:190px;overflow:auto;padding:9px;border:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border));border-radius:8px;background:var(--dsw-alias-bg-module-platform,#8881)}
 .dsh-ia-diff ins {background:#27a35b26;text-decoration:none;border-radius:3px}

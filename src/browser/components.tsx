@@ -50,6 +50,29 @@ function useFloatingPlacement(anchor: RefObject<HTMLElement>, surface: RefObject
   return placement
 }
 
+/** Anchor a notice just above the composer card so it never covers the editor. */
+function useAboveCard(anchor: RefObject<HTMLElement>, visible: boolean): { bottom: number; right: number } | null {
+  const [placement, setPlacement] = useState<{ bottom: number; right: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!visible) { setPlacement(null); return }
+    const card = () => anchor.current?.closest<HTMLElement>('[data-composer-card]') ?? null
+    const update = () => {
+      const element = card()
+      if (!element) { setPlacement(null); return }
+      const rect = element.getBoundingClientRect()
+      setPlacement({ bottom: Math.max(12, window.innerHeight - rect.top + 8), right: Math.max(12, window.innerWidth - rect.right) })
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    const element = card()
+    const observer = typeof ResizeObserver === 'function' && element ? new ResizeObserver(update) : null
+    if (element && observer) observer.observe(element)
+    return () => { window.removeEventListener('resize', update); window.removeEventListener('scroll', update, true); observer?.disconnect() }
+  }, [anchor, visible])
+  return placement
+}
+
 function useController(runtime: BrowserRuntime, sessionId: string) {
   const controller = useMemo(() => runtime.controllerFor(sessionId), [runtime, sessionId])
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
@@ -86,7 +109,7 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
   const noticeRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const menuPlacement = useFloatingPlacement(anchor, menuRef, open)
-  const noticePlacement = useFloatingPlacement(anchor, noticeRef, !open && Boolean(state.notice))
+  const noticePlacement = useAboveCard(anchor, !open && Boolean(state.notice))
   const [provider, setProvider] = useState(state.settings.provider)
   const [modelId, setModelId] = useState(state.settings.model)
   useEffect(() => { void directory?.load().catch(() => {}) }, [directory])

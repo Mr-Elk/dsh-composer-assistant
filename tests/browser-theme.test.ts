@@ -69,15 +69,16 @@ describe('published DSH theme and clipped-composer regression', () => {
       await browserExpect(menu).toBeVisible()
       expect(await menu.evaluate(element => element.parentElement === document.body)).toBe(true)
       expect(await surfaceContrast(page, '.dsh-ia-menu')).toBeGreaterThanOrEqual(4.5)
-      expect(await surfaceContrast(page, '.dsh-ia-menu select[aria-label="优化强度"]')).toBeGreaterThanOrEqual(4.5)
+      expect(await surfaceContrast(page, '.dsh-ia-menu-row')).toBeGreaterThanOrEqual(4.5)
       const box = (await menu.boundingBox())!
       expect(box.y).toBeGreaterThanOrEqual(11)
       expect(box.y + box.height).toBeLessThanOrEqual(709)
       await browserExpect(menu.getByText('输入助手', { exact: true })).toBeInViewport()
-      await page.getByLabel('输入续写', { exact: true }).check()
-      await browserExpect(menu).toBeVisible()
-      await page.getByLabel('显示方式', { exact: true }).selectOption('panel')
       await page.getByRole('button', { name: '输入助手菜单', exact: true }).click()
+      // Settings now live on the settings page; drive the same controller directly.
+      await page.evaluate(async () => {
+        await (window as any).fixture.runtime.controllerFor('web-smoke').updateSettings({ completionEnabled: true, displayMode: 'panel' })
+      })
       await page.evaluate(() => { (window as any).fixture.setDraft('请解释这段代码的时间'); (window as any).fixture.focus() })
       await browserExpect(page.locator('.dsh-ia-candidate')).toBeVisible()
       expect(await surfaceContrast(page, '.dsh-ia-candidate')).toBeGreaterThanOrEqual(4.5)

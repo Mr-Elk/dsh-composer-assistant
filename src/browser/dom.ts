@@ -58,17 +58,28 @@ export interface GhostGeometry {
   left: number; top: number; width: number; maxHeight: number; font: string; lineHeight: string; letterSpacing: string
 }
 
+export type GhostMeasurement =
+  | { kind: 'ok'; geometry: GhostGeometry }
+  | { kind: 'unfocused' }
+  | { kind: 'offscreen' }
+  | { kind: 'narrow' }
+
 /** Read-only DOM measurements; failure hides the decoration instead of guessing padding. */
 export function measureGhost(editor: HTMLElement | null, empty: boolean): GhostGeometry | null {
-  if (!editor || !focusedIn(editor)) return null
+  const result = measureGhostDetail(editor, empty)
+  return result.kind === 'ok' ? result.geometry : null
+}
+
+export function measureGhostDetail(editor: HTMLElement | null, empty: boolean): GhostMeasurement {
+  if (!editor || !focusedIn(editor)) return { kind: 'unfocused' }
   const editorBox = editor.getBoundingClientRect()
-  if (editorBox.width <= 0 || editorBox.height <= 0) return null
+  if (editorBox.width <= 0 || editorBox.height <= 0) return { kind: 'offscreen' }
   const style = getComputedStyle(editor)
   const selection = editor.ownerDocument.getSelection()
   let rect: DOMRect | null = null
   if (selection?.rangeCount === 1) {
     const range = selection.getRangeAt(0)
-    if (!range.collapsed || !editor.contains(range.startContainer)) return null
+    if (!range.collapsed || !editor.contains(range.startContainer)) return { kind: 'offscreen' }
     if (typeof range.getBoundingClientRect === 'function') {
       const measured = range.getBoundingClientRect()
       if (measured.height > 0 && measured.left >= editorBox.left - 1 && measured.left <= editorBox.right + 1) rect = measured
@@ -83,7 +94,7 @@ export function measureGhost(editor: HTMLElement | null, empty: boolean): GhostG
   if (!rect && empty) {
     rect = new DOMRect(editorBox.left + parseFloat(style.paddingLeft || '0'), editorBox.top + parseFloat(style.paddingTop || '0'), 0, parseFloat(style.lineHeight) || parseFloat(style.fontSize))
   }
-  if (!rect) return null
+  if (!rect) return { kind: 'offscreen' }
   // The decoration is portalled outside clipped/paint-contained ancestors. Keep
   // its visible area inside the same intersection that clips the native caret.
   const viewport = window.visualViewport
@@ -102,11 +113,11 @@ export function measureGhost(editor: HTMLElement | null, empty: boolean): GhostG
       if (clipY) { visible.top = Math.max(visible.top, box.top); visible.bottom = Math.min(visible.bottom, box.bottom) }
     }
   }
-  if (rect.left < visible.left - 1 || rect.top < visible.top - 1 || rect.bottom > visible.bottom + 1) return null
+  if (rect.left < visible.left - 1 || rect.top < visible.top - 1 || rect.bottom > visible.bottom + 1) return { kind: 'offscreen' }
   const width = Math.min(editorBox.right - parseFloat(style.paddingRight || '0'), visible.right) - rect.left
-  if (width < 24) return null
-  return { left: rect.left, top: rect.top, width, maxHeight: visible.bottom - rect.top,
-    font: style.font, lineHeight: style.lineHeight, letterSpacing: style.letterSpacing }
+  if (width < 24) return { kind: 'narrow' }
+  return { kind: 'ok', geometry: { left: rect.left, top: rect.top, width, maxHeight: visible.bottom - rect.top,
+    font: style.font, lineHeight: style.lineHeight, letterSpacing: style.letterSpacing } }
 }
 
 export function nativeMenuOpen(editor: HTMLElement | null): boolean {

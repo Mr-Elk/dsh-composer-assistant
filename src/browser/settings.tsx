@@ -119,7 +119,7 @@ export function AssistantSettings({ runtime }: SettingsProps) {
             <input type="number" aria-label="建议超时（秒）" value={Math.round(form.suggestionTimeoutMs / 1000)} min={5} max={60} step={1}
               onChange={event => change('suggestionTimeoutMs', Number(event.target.value) * 1000)} />
           </Row>
-          <Row title="每小时调用上限" hint="自动建议每小时最多调用模型的次数；0 表示不限制，手动优化不计入">
+          <Row title="每小时调用上限" hint="全局上限，只计自动建议；0 表示不限制，手动优化与「换一条」不计入">
             <input type="number" aria-label="每小时调用上限" value={form.hourlyCallLimit} min={0} max={2000} step={10}
               onChange={event => change('hourlyCallLimit', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
           </Row>

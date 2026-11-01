@@ -84,6 +84,22 @@ describe('composed browser surfaces', () => {
     await waitFor(() => expect(f.inputStore.getSnapshot().draft).toBe('请继续解释'))
     expect(f.runtime.controllerFor('session-ui').getSnapshot().metrics.exposures).toBe(1)
   })
+  it('falls back to the card when the caret leaves too little inline width', async () => {
+    const box = { left: 100, top: 500, right: 120, bottom: 520, width: 20, height: 20, x: 100, y: 500, toJSON: () => ({}) } as DOMRect
+    const rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(box)
+    const viewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: { offsetLeft: 0, offsetTop: 0, width: 1024, height: 768, addEventListener() {}, removeEventListener() {} } })
+    try {
+      const f = uiFixture('', 'ghost', true)
+      await waitFor(() => expect(f.generated).toHaveLength(1))
+      await screen.findByRole('button', { name: '采纳' })
+      expect(document.querySelector('.dsh-ia-ghost')).toBeNull()
+    } finally {
+      rectSpy.mockRestore()
+      if (viewport) Object.defineProperty(window, 'visualViewport', viewport)
+      else Reflect.deleteProperty(window, 'visualViewport')
+    }
+  })
   it('does not capture Tab for a ghost hidden because layout could not be measured', async () => {
     const f = uiFixture('', 'ghost', true)
     await waitFor(() => expect(f.generated).toHaveLength(1))

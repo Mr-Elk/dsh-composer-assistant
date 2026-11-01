@@ -110,6 +110,12 @@ describe('literal protection and prompt construction', () => {
     expect(prepared.system).toContain('may not add new work or authorization')
     expect(finishGeneration(JSON.parse(prepared.input).targetText, prepared)).toBe('解释 `apiV2`，不要改文件。')
   })
+  it('keeps paragraph structure in optimizations while folding suggestion line breaks', () => {
+    const optimize = prepareGeneration(request({ draft: '整理成提示词', targetText: '整理成提示词' }), [], resolveConfig())
+    expect(finishGeneration('第一段\n\n- 要点一\n- 要点二', optimize)).toBe('第一段\n\n- 要点一\n- 要点二')
+    const next = prepareGeneration(request({ operation: 'next', draft: '' }), [{ role: 'assistant', text: '继续吗？' }], resolveConfig())
+    expect(finishGeneration('先跑测试\n再提交', next)).toBe('先跑测试 再提交')
+  })
   it('rejects an optimization that grows far beyond the target and keeps wrapped suggestions', () => {
     const prepared = prepareGeneration(request({ draft: '解释缓存', targetText: '解释缓存' }), [], resolveConfig())
     expect(() => finishGeneration('很长的一段改写'.repeat(200), prepared)).toThrow(/过长/)

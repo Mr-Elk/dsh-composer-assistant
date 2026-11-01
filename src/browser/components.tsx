@@ -7,7 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import { diffText } from '../core/diff'
 import { PLUGIN_VERSION } from '../core/version'
 import type { StoredDraft } from '../core/types'
-import { canUseTab, findEditor, measureGhost, type GhostGeometry } from './dom'
+import { canUseTab, findEditor, measureGhostDetail, type GhostGeometry } from './dom'
 import type { BrowserRuntime } from './runtime'
 import type { InputAssistantController } from './controller'
 import { placeFloating, type FloatingPlacement } from './floating'
@@ -240,20 +240,27 @@ export function AssistantOverlay({ runtime, sessionId }: OverlayProps) {
   const ghostRef = useRef<HTMLSpanElement>(null)
   const [geometry, setGeometry] = useState<GhostGeometry | null>(null)
   const [overflow, setOverflow] = useState(false)
+  const [narrow, setNarrow] = useState(false)
   const suggestion = state.suggestion
   // A suggestion longer than the composer's visible area cannot render inline;
   // fall back to the floating card instead of clipping the text.
-  const panelMode = state.settings.displayMode === 'panel' || overflow
+  const panelMode = state.settings.displayMode === 'panel' || overflow || narrow
   const panelPlacement = useFloatingPlacement(anchor, panelRef, Boolean(suggestion) && panelMode, true)
   useEffect(() => {
-    if (!suggestion) setOverflow(false)
+    if (!suggestion) { setOverflow(false); setNarrow(false) }
   }, [suggestion])
   useEffect(() => {
     if (suggestion && ((panelMode && panelPlacement) || (!panelMode && geometry))) controller.markExposed(suggestion.snapshot.requestId)
   }, [controller, suggestion, geometry, panelPlacement, panelMode])
   useLayoutEffect(() => {
     if (!suggestion || state.settings.displayMode !== 'ghost') { setGeometry(null); return }
-    const update = () => setGeometry(measureGhost(findEditor(anchor.current), suggestion.snapshot.draft === ''))
+    const update = () => {
+      const result = measureGhostDetail(findEditor(anchor.current), suggestion.snapshot.draft === '')
+      setGeometry(result.kind === 'ok' ? result.geometry : null)
+      // A caret near the right edge leaves too little room for inline text; the
+      // card is the only surface that can still show the suggestion.
+      setNarrow(result.kind === 'narrow')
+    }
     update()
     window.addEventListener('resize', update)
     window.addEventListener('scroll', update, true)

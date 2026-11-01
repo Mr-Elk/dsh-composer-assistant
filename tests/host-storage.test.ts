@@ -87,6 +87,16 @@ describe('stored settings survive version drift', () => {
     expect(settings.displayMode).toBe('panel')
   })
 
+  it('keeps a complete auxiliary model pair across save and reload', async () => {
+    const f = seeded({ ...DEFAULT_CONFIG })
+    const saved = await f.storage.updateSettings({ provider: 'fixture', model: 'model-a' })
+    expect(saved.provider).toBe('fixture')
+    expect(saved.model).toBe('model-a')
+    const stored = f.read().settings as { provider?: string; model?: string }
+    expect(stored.provider).toBe('fixture')
+    expect(stored.model).toBe('model-a')
+    expect(await f.storage.settings()).toMatchObject({ provider: 'fixture', model: 'model-a' })
+  })
   it('drops a half-filled auxiliary model pair', async () => {
     const f = seeded({ ...DEFAULT_CONFIG, provider: 'only-provider', model: '' })
     expect(await f.storage.settings()).toMatchObject({ provider: '', model: '' })

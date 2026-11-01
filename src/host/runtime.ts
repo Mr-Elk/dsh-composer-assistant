@@ -19,6 +19,7 @@ const generationRequest: z.ZodType<GenerationRequest> = z.object({
   connectionGeneration: stringId, routeKey: z.string().max(1000),
   targetText: z.string().max(32_000).optional(), lockedFragments: z.array(z.string().min(1).max(32_000)).max(100).optional(),
   provider: z.string().max(200).optional(), model: z.string().max(200).optional(),
+  regenerate: z.boolean().optional(),
 })
 
 interface SessionRuntime { generation: string; lastNextTurn: string | null; lastCompletionAt: number }
@@ -114,14 +115,16 @@ export class AssistantHostRuntime {
       // an RPC arriving after turn/start cannot spend an auxiliary call.
       if (!settings.completionEnabled || transcript.running) return this.result(request, null)
       const now = Date.now()
-      if (now - state.lastCompletionAt < settings.minIntervalMs) return this.result(request, null)
+      // An explicit "one more" click must not be swallowed by the automatic throttle.
+      if (!request.regenerate && now - state.lastCompletionAt < settings.minIntervalMs) return this.result(request, null)
       state.lastCompletionAt = now
     }
     // User-configured budget applies to automatic suggestions only: a manual
     // optimize click should never be silently dropped. 0 means unlimited.
-    if (request.operation !== 'optimize' && !this.budget.allow(request.sessionId, settings.hourlyCallLimit)) {
-      return this.result(request, null)
-    }
+    // One global budget: the UI promises "per hour", not "per session".
+    // Manual optimize and "换一条" are explicit user actions and never counted.
+    if (request.operation !== 'optimize' && !request.regenerate
+      && !this.budget.allow('global', settings.hourlyCallLimit)) return this.result(request, null)
     const fallback = this.sessionRoute(session)
     const provider = settings.provider || request.provider || fallback?.provider
     const model = settings.model || request.model || fallback?.model

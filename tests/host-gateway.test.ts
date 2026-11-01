@@ -4,6 +4,7 @@ import SessionStore, { SessionId, type Session } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import { TypertGatewayService } from '@deepseek-ai/dsh-api-gateway'
+import RemoteAccessService from '@deepseek-ai/dsh-api-remote-access'
 import { Peer } from '@deepseek-ai/dsh-client-connection'
 import LlmRuntime, { createAssistantMessage, createUserMessage, LlmAdapter, ReasoningEffortId, type GenerateOptions, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { Domain, DomainSpec } from '@deepseek-ai/dsh-storage-domain'
@@ -58,6 +59,7 @@ async function fixture() {
   new SessionStore(ctx)
   new SessionProjectionRegistry(ctx)
   new TestStorageDomain(ctx)
+  new RemoteAccessService(ctx)
   const llm = new LlmRuntime(ctx), adapter = new TestAdapter()
   llm.registerAdapter(['fixture'], adapter)
   const gateway = new TypertGatewayService(ctx, {})
@@ -198,6 +200,29 @@ describe('real DSH Gateway / projection / LLM composition', () => {
     expect(await f.call('drafts/list', { sessionId: f.session.id })).toEqual(saved)
     expect(await f.call('drafts/delete', { sessionId: f.session.id, id: saved[0]!.id })).toEqual([])
     expect(await f.call('drafts/clear', { sessionId: f.session.id })).toEqual([])
+  })
+
+  it('honors regenerate through the strict request schema instead of dropping it', async () => {
+    const f = await fixture()
+    complete(f.session, 1)
+    const status = await f.call<AssistantStatus>('status', { sessionId: f.session.id })
+    const first = await f.call<GenerationResult>('generate', generation(status, { requestId: 'next-1' }))
+    expect(first.text).toBeTruthy()
+    expect(f.adapter.requests).toHaveLength(1)
+    const duplicate = await f.call<GenerationResult>('generate', generation(status, { requestId: 'next-2' }))
+    expect(duplicate.text).toBeNull()
+    expect(f.adapter.requests).toHaveLength(1)
+    const again = await f.call<GenerationResult>('generate', generation(status, { requestId: 'next-3', regenerate: true }))
+    expect(again.text).toBeTruthy()
+    expect(f.adapter.requests).toHaveLength(2)
+  })
+
+  it('rejects a non-owner principal before dispatch', async () => {
+    const f = await fixture()
+    const stranger = new Peer(f.ctx, { principal: { kind: 'user' } as never })
+    await expect(f.gateway.invoke({ namespace: 'input-assistant', method: 'call', args: { payload: { method: 'settings/get', data: {} } }, peer: stranger }))
+      .rejects.toMatchObject({ details: { action: 'input-assistant/call', reason: 'no-allow' } })
+    expect(f.adapter.requests).toHaveLength(0)
   })
 
   it('unloads strict endpoint and rejects malformed requests without reaching a model', async () => {

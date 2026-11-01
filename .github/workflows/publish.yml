@@ -48,9 +48,21 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Same pack the release CI audits; publish from source keeps the
-      # published artifact reproducible with the repo state.
-      - name: Publish
-        run: pnpm publish --no-git-checks --access public
+      # The Edge theme test needs Windows; everything else must pass here.
+      - name: Test
+        run: pnpm exec vitest run --exclude tests/browser-theme.test.ts
+
+      - name: Pack
+        run: pnpm pack --pack-destination dist
+
+      # Verify the exact tarball that will be published, then publish that file.
+      - name: Verify package
+        run: pnpm test:package
+
+      - name: Publish verified tarball
+        run: |
+          PKG=$(node -p "require('./package.json').name")
+          VER=$(node -p "require('./package.json').version")
+          npm publish "dist/${PKG}-${VER}.tgz" --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

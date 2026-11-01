@@ -54,7 +54,7 @@ function validate(config: AssistantConfig): AssistantConfig {
  * rather than be silently dropped from a partial update.
  */
 export function resolveConfig(input: Partial<AssistantConfig> = {}): AssistantConfig {
-  for (const key of Object.keys(input)) if (!(key in DEFAULT_CONFIG)) throw new AssistantError('CONFIG', `未知配置：${key}`)
+  for (const key of Object.keys(input)) if (!Object.hasOwn(DEFAULT_CONFIG, key)) throw new AssistantError('CONFIG', `未知配置：${key}`)
   return validate({ ...DEFAULT_CONFIG, ...input })
 }
 
@@ -71,13 +71,23 @@ export function resolveStoredConfig(input: unknown): AssistantConfig {
   const record = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : {}
   const config: Record<string, unknown> = { ...DEFAULT_CONFIG }
   for (const key of Object.keys(DEFAULT_CONFIG) as (keyof AssistantConfig)[]) {
+    if (key === 'provider' || key === 'model') continue
     if (!(key in record)) continue
     const value = record[key]
     const candidate = { ...DEFAULT_CONFIG, [key]: value } as AssistantConfig
     try { validate({ ...candidate }) } catch { continue }
     config[key] = typeof value === 'string' ? value.trim() : value
   }
-  // `provider`/`model` are only valid as a pair; a half-filled pair falls back to follow-the-composer.
-  if (Boolean(config.provider) !== Boolean(config.model)) { config.provider = ''; config.model = '' }
+  // `provider`/`model` are one group: validating them separately against the
+  // empty default would silently drop a complete pair. Keep both or neither.
+  const provider = typeof record.provider === 'string' ? record.provider.trim() : ''
+  const model = typeof record.model === 'string' ? record.model.trim() : ''
+  if (provider && model && provider.length <= 200 && model.length <= 200) {
+    config.provider = provider
+    config.model = model
+  } else {
+    config.provider = ''
+    config.model = ''
+  }
   return config as unknown as AssistantConfig
 }

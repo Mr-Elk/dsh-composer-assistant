@@ -5,7 +5,7 @@ import { Session, type SessionId } from '@deepseek-ai/dsh-session'
 import { BlockAssembler, type GenerateOptions } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-typert-registry'
-import { AssistantError, SessionScheduler, prepareGeneration, finishGeneration, PLUGIN_NAME, PLUGIN_VERSION, PACKAGE_URL, type AssistantConfig, type AssistantStatus, type GenerationRequest, type GenerationResult, type ModelRoute, type UpdateCheckResult } from '../core/index'
+import { AssistantError, CallBudget, SessionScheduler, prepareGeneration, finishGeneration, PLUGIN_NAME, PLUGIN_VERSION, PACKAGE_URL, type AssistantConfig, type AssistantStatus, type GenerationRequest, type GenerationResult, type ModelRoute, type UpdateCheckResult } from '../core/index'
 import { AssistantStorage } from './storage'
 import { emptyTranscript } from './transcript'
 import type { RpcPayload } from './rpc'
@@ -117,6 +117,8 @@ export class AssistantHostRuntime {
       if (now - state.lastCompletionAt < settings.minIntervalMs) return this.result(request, null)
       state.lastCompletionAt = now
     }
+    // Silent budget: a runaway client must not spend a session's quota on looped requests.
+    if (!this.budget.allow(request.sessionId)) return this.result(request, null)
     const fallback = this.sessionRoute(session)
     const provider = settings.provider || request.provider || fallback?.provider
     const model = settings.model || request.model || fallback?.model
@@ -187,6 +189,8 @@ export class AssistantHostRuntime {
   dispose(): void { this.disposed = true; this.scheduler.dispose() }
 
   private updateCache: { at: number; result: UpdateCheckResult } | null = null
+  /** Silent guard: at most 40 auxiliary calls per session per hour. */
+  private readonly budget = new CallBudget(40)
 
   async invoke(payload: RpcPayload, signal: AbortSignal): Promise<unknown> {
     signal.throwIfAborted()

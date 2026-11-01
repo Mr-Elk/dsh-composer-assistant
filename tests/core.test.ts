@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DEFAULT_CONFIG, resolveConfig, protectText, restoreProtected, prepareGeneration, finishGeneration, NO_SUGGESTION, buildContext, charCount, snapshotMatches, diffText, SessionScheduler, type GenerationRequest } from '../src/core'
+import { DEFAULT_CONFIG, resolveConfig, protectText, restoreProtected, prepareGeneration, finishGeneration, NO_SUGGESTION, buildContext, charCount, snapshotMatches, diffText, SessionScheduler, CallBudget, type GenerationRequest } from '../src/core'
 
 const request = (extra: Partial<GenerationRequest> = {}): GenerationRequest => ({
   operation: 'optimize', requestId: 'r1', sessionId: 's1', sourceTurnId: 'turn1',
@@ -123,6 +123,19 @@ describe('literal protection and prompt construction', () => {
     expect(prepareGeneration(request({ operation: 'next', draft: '' }), [], config).operation).toBe('next')
   })
 })
+describe('auxiliary call budget', () => {
+  it('caps calls per session and slides the window', () => {
+    const budget = new CallBudget(2, 1000)
+    expect(budget.allow('a', 1000)).toBe(true)
+    expect(budget.allow('a', 1001)).toBe(true)
+    expect(budget.allow('a', 1002)).toBe(false)
+    expect(budget.allow('b', 1002)).toBe(true)
+    expect(budget.count('a', 1003)).toBe(2)
+    expect(budget.allow('a', 2001)).toBe(true)
+    expect(budget.count('a', 2002)).toBe(1)
+  })
+})
+
 describe('bounded context, snapshots, and diff', () => {
   it('preserves task anchor and latest correction under a giant assistant reply', () => {
     const result = buildContext([

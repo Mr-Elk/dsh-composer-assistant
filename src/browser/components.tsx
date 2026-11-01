@@ -18,7 +18,7 @@ type OverlayProps = PropsRuntime<'conversation.input.overlay'> & RuntimeProps
 const EMPTY_MODEL = { current: null }
 const noopSubscribe = (): (() => void) => () => {}
 
-function useFloatingPlacement(anchor: RefObject<HTMLElement>, surface: RefObject<HTMLElement>, visible: boolean, card = false): FloatingPlacement | null {
+function useFloatingPlacement(anchor: RefObject<HTMLElement>, surface: RefObject<HTMLElement>, visible: boolean, card = false, preferredWidth = 440): FloatingPlacement | null {
   const [placement, setPlacement] = useState<FloatingPlacement | null>(null)
   useLayoutEffect(() => {
     if (!visible) { setPlacement(null); return }
@@ -31,7 +31,7 @@ function useFloatingPlacement(anchor: RefObject<HTMLElement>, surface: RefObject
         width: viewport?.width ?? window.innerWidth, height: viewport?.height ?? window.innerHeight }
       const rect = trigger.getBoundingClientRect()
       const next = placeFloating(rect, element.scrollHeight || element.getBoundingClientRect().height || 160, bounds,
-        card ? Math.min(640, rect.width || 440) : 440)
+        card ? Math.min(640, rect.width || 440) : preferredWidth)
       setPlacement(previous => previous && Object.keys(next).every(key => previous[key as keyof FloatingPlacement] === next[key as keyof FloatingPlacement]) ? previous : next)
     }
     update()
@@ -109,7 +109,7 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
   const menuRef = useRef<HTMLDivElement>(null)
   const noticeRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
-  const menuPlacement = useFloatingPlacement(anchor, menuRef, open)
+  const menuPlacement = useFloatingPlacement(anchor, menuRef, open, false, 360)
   const noticePlacement = useAboveCard(anchor, !open && Boolean(state.notice))
   useEffect(() => { void directory?.load().catch(() => {}) }, [directory])
   useLayoutEffect(() => {
@@ -169,49 +169,47 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
       <div className="dsh-ia-menu-head"><strong>输入助手</strong><span className="dsh-ia-muted">采纳后由你发送</span></div>
       {state.settingsSaving && <div role="status">设置保存中…</div>}
       {state.notice && <div className="dsh-ia-notice" role="status">{state.notice}</div>}
-      <div className="dsh-ia-row">
-        <button type="button" disabled={!canOptimize} onPointerDown={preserveSelection} onClick={() => controller.lockSelection()}>保护选中原文{state.locked.length ? ` (${state.locked.length})` : ''}</button>
-        {state.locked.length > 0 && <button type="button" onClick={() => controller.clearLocks()}>清除保护</button>}
-      </div>
-      <div className="dsh-ia-muted">代码、路径和网址自动保护；手动保护在编辑草稿后清除。</div>
-      {state.change && <details className="dsh-ia-section">
-        <summary>查看改动</summary>
+      <button className="dsh-ia-menu-row" type="button" disabled={!canOptimize} onPointerDown={preserveSelection} onClick={() => controller.lockSelection()}>保护选中原文{state.locked.length ? ` (${state.locked.length})` : ''}</button>
+      {state.locked.length > 0 && <button className="dsh-ia-menu-row" type="button" onClick={() => controller.clearLocks()}>清除保护</button>}
+      <p className="dsh-ia-menu-note">代码、路径和网址自动保护；手动保护在编辑草稿后清除。</p>
+      {state.change && <details className="dsh-ia-menu-section">
+        <summary className="dsh-ia-menu-row">查看改动</summary>
         <div className="dsh-ia-pre dsh-ia-diff">{diffText(state.change.beforeTarget, state.change.afterTarget).map((part, index) => part.type === 'insert'
           ? <ins key={index}>{part.value}</ins> : part.type === 'delete' ? <del key={index}>{part.value}</del> : <span key={index}>{part.value}</span>)}</div>
-        <div className="dsh-ia-row">
+        <div className="dsh-ia-menu-actions">
           <button type="button" disabled={!controller.canRestore()} onPointerDown={preserveSelection} onClick={() => controller.restoreOriginal()}>还原</button>
           <button type="button" onClick={() => { void copyText(state.change!.beforeTarget, controller) }}>复制原文</button>
         </div>
-        {!controller.canRestore() && <div className="dsh-ia-muted">草稿已有新编辑，原文仍可复制。</div>}
+        {!controller.canRestore() && <p className="dsh-ia-menu-note">草稿已有新编辑，原文仍可复制。</p>}
       </details>}
-      <section className="dsh-ia-section">
-        <h4>草稿暂存 ({state.drafts.length}/3)</h4>
-        <button type="button" disabled={!state.settings.stashEnabled || !canEdit || !pure || !input.draft.trim() || state.drafts.length >= 3} onPointerDown={preserveSelection} onClick={() => { void controller.stash() }}>暂存并清空</button>
-        {!state.settings.stashEnabled && <p className="dsh-ia-muted">暂存已关闭；历史草稿仍可查看和删除，重新启用后可恢复。</p>}
-        {!pure && <p className="dsh-ia-muted">暂存和恢复仅支持无引用、无附件的纯文本草稿。</p>}
-        {state.drafts.map(draft => <DraftCard key={draft.id} draft={draft} controller={controller} canEdit={state.settings.stashEnabled && canEdit && pure}
-          canReplace={state.settings.stashEnabled && canEdit && pure && Boolean(input.draft.trim()) && state.drafts.length >= 3} />)}
-        {state.drafts.length === 0 && <p className="dsh-ia-muted">暂存后可以先追问别的，再找回原来的草稿。</p>}
-        {state.drafts.length > 0 && <button type="button" onClick={() => { void controller.clearDrafts() }}>清空暂存</button>}
-      </section>
-      <section className="dsh-ia-section">
-        <h4>建议</h4>
-        <div className="dsh-ia-row"><button type="button" onClick={() => { void controller.regenerateSuggestion() }}>换一条建议</button><button type="button" onClick={() => controller.dismissSuggestion()}>暂停至下次编辑</button></div>
-      </section>
-      <details className="dsh-ia-section"><summary>本次使用统计</summary>
-        <p className="dsh-ia-muted">当前会话：展示 {state.metrics.exposures} 次，采纳 {state.metrics.accepted} 次，
+      <div className="dsh-ia-menu-sep" />
+      <div className="dsh-ia-menu-title">草稿暂存 ({state.drafts.length}/3)</div>
+      <button className="dsh-ia-menu-row" type="button" disabled={!state.settings.stashEnabled || !canEdit || !pure || !input.draft.trim() || state.drafts.length >= 3} onPointerDown={preserveSelection} onClick={() => { void controller.stash() }}>暂存并清空</button>
+      {!state.settings.stashEnabled && <p className="dsh-ia-menu-note">暂存已关闭；历史草稿仍可查看和删除，重新启用后可恢复。</p>}
+      {!pure && <p className="dsh-ia-menu-note">暂存和恢复仅支持无引用、无附件的纯文本草稿。</p>}
+      {state.drafts.map(draft => <DraftCard key={draft.id} draft={draft} controller={controller} canEdit={state.settings.stashEnabled && canEdit && pure}
+        canReplace={state.settings.stashEnabled && canEdit && pure && Boolean(input.draft.trim()) && state.drafts.length >= 3} />)}
+      {state.drafts.length === 0 && <p className="dsh-ia-menu-note">暂存后可以先追问别的，再找回原来的草稿。</p>}
+      {state.drafts.length > 0 && <button className="dsh-ia-menu-row" type="button" onClick={() => { void controller.clearDrafts() }}>清空暂存</button>}
+      <div className="dsh-ia-menu-sep" />
+      <div className="dsh-ia-menu-title">建议</div>
+      <button className="dsh-ia-menu-row" type="button" onClick={() => { void controller.regenerateSuggestion() }}>换一条建议</button>
+      <button className="dsh-ia-menu-row" type="button" onClick={() => controller.dismissSuggestion()}>暂停至下次编辑</button>
+      <div className="dsh-ia-menu-sep" />
+      <details className="dsh-ia-menu-section">
+        <summary className="dsh-ia-menu-row">本次使用统计</summary>
+        <p className="dsh-ia-menu-note">当前会话：展示 {state.metrics.exposures} 次，采纳 {state.metrics.accepted} 次，
           采纳后继续编辑 {state.metrics.editedAcceptances} 次，编辑字数约 {state.metrics.editedCharacters}，辅助调用 {state.metrics.calls} 次。</p>
-        <div className="dsh-ia-muted">仅保留在本次插件运行内，不上传；忽略建议不会被视为负反馈。</div>
+        <p className="dsh-ia-menu-note">仅保留在本次插件运行内，不上传；忽略建议不会被视为负反馈。</p>
       </details>
-      <section className="dsh-ia-section">
-        <h4>关于</h4>
-        <div className="dsh-ia-row">
-          <span className="dsh-ia-muted">输入助手 v{PLUGIN_VERSION}</span>
-          <button type="button" disabled={state.updateChecking} onClick={() => { void controller.checkUpdate() }}>{state.updateChecking ? '检查中…' : '检查更新'}</button>
-        </div>
-        <p className="dsh-ia-muted">只查询 npm registry 的版本号；升级需要卸载后在插件管理里重新安装。</p>
-      </section>
-      <p className="dsh-ia-muted">更多设置：DSH 设置 → 输入助手</p>
+      <div className="dsh-ia-menu-sep" />
+      <div className="dsh-ia-menu-title">关于</div>
+      <div className="dsh-ia-menu-about">
+        <span className="dsh-ia-muted">输入助手 v{PLUGIN_VERSION}</span>
+        <button type="button" disabled={state.updateChecking} onClick={() => { void controller.checkUpdate() }}>{state.updateChecking ? '检查中…' : '检查更新'}</button>
+      </div>
+      <p className="dsh-ia-menu-note">只查询 npm registry 的版本号；升级需要卸载后在插件管理里重新安装。</p>
+      <p className="dsh-ia-menu-note">更多设置：DSH 设置 → 输入助手</p>
     </div>, document.body)}
   </div>
 }

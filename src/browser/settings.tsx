@@ -111,6 +111,14 @@ export function AssistantSettings({ runtime }: SettingsProps) {
       <section className="dsh-ia-group">
         <h3>高级</h3>
         <div className="dsh-ia-rows">
+          <Row title="上下文上限" hint="参与建议的对话上下文字数；越长越完整，也越贵">
+            <input type="number" aria-label="上下文上限" value={form.maxHistoryChars} min={1000} max={64000} step={1000}
+              onChange={event => change('maxHistoryChars', Number(event.target.value))} />
+          </Row>
+          <Row title="建议超时" hint="5–60 秒；模型较慢时可放宽，超时不会改动草稿">
+            <input type="number" aria-label="建议超时（秒）" value={Math.round(form.suggestionTimeoutMs / 1000)} min={5} max={60} step={1}
+              onChange={event => change('suggestionTimeoutMs', Number(event.target.value) * 1000)} />
+          </Row>
           <Row title="每小时调用上限" hint="自动建议每小时最多调用模型的次数；0 表示不限制，手动优化不计入">
             <input type="number" aria-label="每小时调用上限" value={form.hourlyCallLimit} min={0} max={2000} step={10}
               onChange={event => change('hourlyCallLimit', event.target.value === '' ? Number.NaN : Number(event.target.value))} />

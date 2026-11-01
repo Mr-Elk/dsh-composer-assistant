@@ -111,6 +111,10 @@ export function AssistantSettings({ runtime }: SettingsProps) {
       <section className="dsh-ia-group">
         <h3>高级</h3>
         <div className="dsh-ia-rows">
+          <Row title="每小时调用上限" hint="自动建议每小时最多调用模型的次数；0 表示不限制，手动优化不计入">
+            <input type="number" aria-label="每小时调用上限" value={form.hourlyCallLimit} min={0} max={2000} step={10}
+              onChange={event => change('hourlyCallLimit', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
+          </Row>
           <Row title="温度" hint="0.3 稳定 / 0.7 平衡 / 1.0 发散；越低越保守">
             <input type="number" aria-label="温度" value={Number.isNaN(form.temperature) ? '' : form.temperature} min={0} max={2} step={0.1}
               onChange={event => change('temperature', event.target.value === '' ? Number.NaN : Number(event.target.value))} />

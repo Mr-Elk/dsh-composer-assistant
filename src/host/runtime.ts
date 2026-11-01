@@ -117,8 +117,11 @@ export class AssistantHostRuntime {
       if (now - state.lastCompletionAt < settings.minIntervalMs) return this.result(request, null)
       state.lastCompletionAt = now
     }
-    // Silent budget: a runaway client must not spend a session's quota on looped requests.
-    if (!this.budget.allow(request.sessionId)) return this.result(request, null)
+    // User-configured budget applies to automatic suggestions only: a manual
+    // optimize click should never be silently dropped. 0 means unlimited.
+    if (request.operation !== 'optimize' && !this.budget.allow(request.sessionId, settings.hourlyCallLimit)) {
+      return this.result(request, null)
+    }
     const fallback = this.sessionRoute(session)
     const provider = settings.provider || request.provider || fallback?.provider
     const model = settings.model || request.model || fallback?.model
@@ -189,8 +192,8 @@ export class AssistantHostRuntime {
   dispose(): void { this.disposed = true; this.scheduler.dispose() }
 
   private updateCache: { at: number; result: UpdateCheckResult } | null = null
-  /** Silent guard: at most 40 auxiliary calls per session per hour. */
-  private readonly budget = new CallBudget(40)
+  /** Sliding-window counter for automatic auxiliary calls; the limit comes from settings. */
+  private readonly budget = new CallBudget()
 
   async invoke(payload: RpcPayload, signal: AbortSignal): Promise<unknown> {
     signal.throwIfAborted()

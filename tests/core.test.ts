@@ -125,14 +125,19 @@ describe('literal protection and prompt construction', () => {
 })
 describe('auxiliary call budget', () => {
   it('caps calls per session and slides the window', () => {
-    const budget = new CallBudget(2, 1000)
-    expect(budget.allow('a', 1000)).toBe(true)
-    expect(budget.allow('a', 1001)).toBe(true)
-    expect(budget.allow('a', 1002)).toBe(false)
-    expect(budget.allow('b', 1002)).toBe(true)
+    const budget = new CallBudget(1000)
+    expect(budget.allow('a', 2, 1000)).toBe(true)
+    expect(budget.allow('a', 2, 1001)).toBe(true)
+    expect(budget.allow('a', 2, 1002)).toBe(false)
+    expect(budget.allow('b', 2, 1002)).toBe(true)
     expect(budget.count('a', 1003)).toBe(2)
-    expect(budget.allow('a', 2001)).toBe(true)
+    expect(budget.allow('a', 2, 2001)).toBe(true)
     expect(budget.count('a', 2002)).toBe(1)
+  })
+  it('treats zero as unlimited', () => {
+    const budget = new CallBudget(1000)
+    for (let index = 0; index < 50; index += 1) expect(budget.allow('a', 0, 1000 + index)).toBe(true)
+    expect(budget.count('a', 1010)).toBe(50)
   })
 })
 

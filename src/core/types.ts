@@ -21,6 +21,7 @@ export interface AssistantConfig {
   suggestionTimeoutMs: number
   provider: string
   model: string
+  hourlyCallLimit: number
   temperature: number
   extraInstruction: string
 }
@@ -30,7 +31,7 @@ export const DEFAULT_CONFIG: Readonly<AssistantConfig> = Object.freeze({
   debounceMs: 600, minIntervalMs: 2000, maxHistoryChars: 16000,
   maxDraftChars: 8000, suggestionLength: 'standard',
   optimizeTimeoutMs: 60000, suggestionTimeoutMs: 15000, provider: '', model: '',
-  temperature: 0.7, extraInstruction: '',
+  hourlyCallLimit: 0, temperature: 0.7, extraInstruction: '',
 })
 export interface InputSnapshot {
   requestId: string

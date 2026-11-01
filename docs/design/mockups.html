@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>输入助手 · 设计图</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;padding:32px;background:#ececeb;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",sans-serif;display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+  .board{background:var(--surface);color:var(--text);border-radius:14px;padding:24px;box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 12px 32px rgba(0,0,0,.10)}
+  [data-theme=light]{--surface:#fff;--text:#0f1115;--muted:#61666b;--line:rgba(0,0,0,.1);--hover:rgba(0,0,0,.04);--accent:#4176e6;--accent-soft:#e8effc;--chip:#f4f4f5}
+  [data-theme=dark]{--surface:#232324;--text:#f3f4f6;--muted:#adb2b8;--line:rgba(255,255,255,.12);--hover:rgba(255,255,255,.06);--accent:#4c88e4;--accent-soft:#26324a;--chip:#2c2c2e}
+  .title{font-size:15px;font-weight:600;margin:0 0 4px}
+  .sub{font-size:12px;color:var(--muted);margin:0 0 20px}
+  .group{display:flex;flex-direction:column;gap:10px;margin-bottom:28px}
+  .gtitle{font-size:14px;font-weight:500;line-height:22px;margin:0}
+  .rows{display:flex;flex-direction:column}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  .row-main{display:flex;flex-direction:column;gap:2px}
+  .row b{font-size:14px;font-weight:400;line-height:22px}
+  .row small{font-size:13px;line-height:20px;color:var(--muted)}
+  .switch{width:36px;height:20px;border-radius:999px;background:var(--accent);position:relative;flex:0 0 auto}
+  .switch::after{content:"";position:absolute;top:2px;left:18px;width:16px;height:16px;border-radius:50%;background:#fff}
+  .switch.off{background:var(--line)}
+  .switch.off::after{left:2px}
+  .select,.num{min-height:28px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--muted);font-size:13px;font-weight:500;padding:0 10px;display:inline-flex;align-items:center;gap:8px}
+  .select::after{content:"⌄";font-size:12px}
+  .num{width:88px;justify-content:flex-end}
+  .field{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+  .field-title{font-size:14px;line-height:22px}
+  .field-hint{font-size:13px;line-height:20px;color:var(--muted)}
+  textarea{margin-top:6px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-size:13px;padding:8px 10px;resize:none;min-height:64px}
+  .actions{display:flex;gap:10px;align-items:center;padding-top:16px;border-top:1px solid var(--line)}
+  .btn{border:0;border-radius:8px;font:inherit;font-size:13px;height:30px;padding:0 14px;cursor:default}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.ghost{background:transparent;color:var(--muted)}
+
+  .menu{width:360px;padding:4px;border-radius:16px;box-shadow:0 0 0 .5px rgba(0,0,0,.04),0 3px 8px rgba(0,0,0,.04),0 0 20px rgba(0,0,0,.05);background:var(--surface);color:var(--text)}
+  .menu-head{display:flex;justify-content:space-between;align-items:baseline;padding:8px 8px 6px;font-size:13px}
+  .menu-head b{font-weight:600}
+  .menu-head span{color:var(--muted);font-size:12px}
+  .menu-row{display:flex;align-items:center;min-height:34px;padding:0 8px;border-radius:10px;font-size:13px}
+  .menu-row.hot{background:var(--hover)}
+  .menu-title{padding:8px 8px 2px;font-size:12px;color:var(--muted)}
+  .menu-note{margin:0;padding:2px 8px 6px;font-size:12px;line-height:18px;color:var(--muted)}
+  .sep{height:1px;margin:4px 8px;background:var(--line)}
+  .about{display:flex;justify-content:space-between;align-items:center;padding:2px 8px 4px;font-size:13px}
+  .about span{color:var(--muted)}
+
+  .composer{width:720px;border-radius:22px;padding:8px 0 0;background:var(--surface);box-shadow:0 0 0 .5px rgba(0,0,0,.05),0 8px 30px rgba(0,0,0,.08)}
+  .composer .text{padding:8px 20px 18px;font-size:15px;line-height:26px}
+  .composer .text .ghost{color:#9aa0a6}
+  .keycap{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid var(--line);border-radius:5px;font-size:10px;line-height:14px;color:var(--muted)}
+  .composer .bar{display:flex;align-items:center;gap:8px;padding:0 12px 10px}
+  .tool{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border-radius:8px;color:var(--muted);font-size:13px}
+  .tool.hot{background:var(--hover)}
+  .plus{width:32px;height:32px;border-radius:50%;background:var(--chip);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted)}
+  .spacer{flex:1}
+  .model{height:28px;padding:0 4px 0 8px;border-radius:8px;color:var(--muted);font-size:13px;display:flex;align-items:center;gap:6px}
+  .send{width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .caption{font-size:12px;color:#8a8a88;font-family:inherit;margin:-20px 0 0}
+</style>
+</head>
+<body>
+<script>
+const settings = `
+  <p class="title">输入助手</p>
+  <p class="sub">帮助你形成准确、可发送的输入。开关决定要不要这个功能，其余保持默认即可。</p>
+  <div class="group"><p class="gtitle">功能</p><div class="rows">
+    <div class="row"><span class="row-main"><b>提示词优化</b><small>把草稿或选中文字改写成可发送的表达</small></span><span class="switch"></span></div>
+    <div class="row"><span class="row-main"><b>回复后预测</b><small>助手回复结束后，为空输入框预测下一句</small></span><span class="switch"></span></div>
+    <div class="row"><span class="row-main"><b>输入续写</b><small>按当前草稿与光标位置继续写</small></span><span class="switch"></span></div>
+    <div class="row"><span class="row-main"><b>草稿暂存</b><small>每个会话保留最多三份草稿</small></span><span class="switch"></span></div>
+  </div></div>
+  <div class="group"><p class="gtitle">建议</p><div class="rows">
+    <div class="row"><span class="row-main"><b>建议长度</b><small>短更克制，长更完整；放不下时自动改用候选卡</small></span><span class="select">长</span></div>
+    <div class="row"><span class="row-main"><b>触发方式</b><small>自动：每轮结束请求一次；手动：只用菜单里的「换一条建议」</small></span><span class="select">自动</span></div>
+  </div></div>
+  <div class="group"><p class="gtitle">优化</p><div class="rows">
+    <div class="row"><span class="row-main"><b>优化强度</b><small>轻度只修表达，深度可重组结构；各档都不新增任务或授权</small></span><span class="select">标准优化</span></div>
+  </div></div>
+  <div class="group"><p class="gtitle">辅助模型</p><p class="field-hint" style="margin:0">两项同时留空时跟随输入框模型；辅助调用单独消耗模型用量。</p><div class="rows">
+    <div class="row"><span class="row-main"><b>提供商</b></span><span class="select" style="width:180px;justify-content:space-between">跟随输入框</span></div>
+    <div class="row"><span class="row-main"><b>模型</b></span><span class="select" style="width:180px;justify-content:space-between">跟随输入框</span></div>
+  </div></div>
+  <div class="group"><p class="gtitle">高级</p><div class="rows">
+    <div class="row"><span class="row-main"><b>上下文上限</b><small>参与建议的对话上下文字数；越长越完整，也越贵</small></span><span class="num">16000</span></div>
+    <div class="row"><span class="row-main"><b>建议超时</b><small>5–60 秒；模型较慢时可放宽，超时不会改动草稿</small></span><span class="num">20</span></div>
+    <div class="row"><span class="row-main"><b>每小时调用上限</b><small>自动建议每小时最多调用模型的次数；0 表示不限制</small></span><span class="num">0</span></div>
+    <div class="row"><span class="row-main"><b>温度</b><small>0.3 稳定 / 0.7 平衡 / 1.0 发散；越低越保守</small></span><span class="num">0.7</span></div>
+  </div>
+  <div class="field"><span class="field-title">额外指令</span><span class="field-hint">追加到系统提示词，最多 500 字</span><textarea></textarea></div></div>
+  <div class="actions"><button class="btn primary">保存设置</button><button class="btn ghost">放弃修改</button></div>`;
+const menu = `
+  <div class="menu">
+    <div class="menu-head"><b>输入助手</b><span>采纳后由你发送</span></div>
+    <div class="menu-row">保护选中原文</div>
+    <p class="menu-note">代码、路径和网址自动保护；手动保护在编辑草稿后清除。</p>
+    <div class="sep"></div>
+    <div class="menu-title">草稿暂存 (0/3)</div>
+    <div class="menu-row hot">暂存并清空</div>
+    <p class="menu-note">暂存后可以先追问别的，再找回原来的草稿。</p>
+    <div class="sep"></div>
+    <div class="menu-title">建议</div>
+    <div class="menu-row">换一条建议</div>
+    <div class="menu-row">暂停至下次编辑</div>
+    <div class="sep"></div>
+    <div class="menu-title">关于</div>
+    <div class="about"><span>输入助手 v0.2.0</span><span>检查更新</span></div>
+    <p class="menu-note">只查询 npm registry 的版本号；升级需要卸载后在插件管理里重新安装。</p>
+  </div>`;
+const composer = `
+  <div class="composer">
+    <div class="text">请解释缓存失效<span class="ghost">，以及它对多用户并发的影响。</span><span class="keycap">Tab</span></div>
+    <div class="bar">
+      <span class="plus">+</span>
+      <span class="tool">◌ 工作区内修改 ⌄</span>
+      <span class="spacer"></span>
+      <span class="tool hot">✦ 优化 ⌄</span>
+      <span class="model">DeepSeek V4.1 Flash (latest) (CC) max ⌄</span>
+      <span class="send">↑</span>
+    </div>
+  </div>`;
+for (const [kind, html] of [['settings', settings], ['menu', menu], ['composer', composer]]) {
+  for (const theme of ['light', 'dark']) {
+    const board = document.createElement('div');
+    board.className = 'board';
+    board.id = `${kind}-${theme}`;
+    board.dataset.theme = theme;
+    board.innerHTML = html;
+    document.body.append(board);
+  }
+}
+</script>
+</body>
+</html>

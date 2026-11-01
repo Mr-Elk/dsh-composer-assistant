@@ -288,3 +288,16 @@ flex 列容器（`gap: 32px`）后才真正生效。这是“间距怎么调都�
 ![工具条](design/final-composer.png)
 
 ![菜单](design/final-menu.png)
+
+## 设计图（0.2.0）
+
+可编辑源：[`docs/design/mockups.html`](design/mockups.html)，同一份 HTML 生成浅色与深色两套板。
+
+| 组件 | 浅色 | 深色 |
+| --- | --- | --- |
+| 设置页 | [`settings-light.png`](design/mockups/settings-light.png) | [`settings-dark.png`](design/mockups/settings-dark.png) |
+| 动作菜单 | [`menu-light.png`](design/mockups/menu-light.png) | [`menu-dark.png`](design/mockups/menu-dark.png) |
+| 输入框 | [`composer-light.png`](design/mockups/composer-light.png) | [`composer-dark.png`](design/mockups/composer-dark.png) |
+
+改视觉时先改 mockup，再改实现，最后用真实实例截图复核；设置项清单见
+[`SETTINGS.md`](SETTINGS.md)。

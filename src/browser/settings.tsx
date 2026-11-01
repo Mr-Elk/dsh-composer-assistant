@@ -128,8 +128,9 @@ export function AssistantSettings({ runtime }: SettingsProps) {
               onChange={event => change('temperature', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
           </Row>
         </div>
-        <label className="dsh-ia-field">
-          <span>额外指令（追加到系统提示词，最多 500 字）</span>
+        <label className="dsh-ia-field dsh-ia-field-block">
+          <span className="dsh-ia-field-title">额外指令</span>
+          <span className="dsh-ia-field-hint">追加到系统提示词，最多 500 字；例如“用更口语的中文”“不要出现列表”</span>
           <textarea aria-label="额外指令" value={form.extraInstruction} maxLength={500} rows={3}
             placeholder="例如：用更口语的中文；不要出现列表；优先给出下一步验证"
             onChange={event => change('extraInstruction', event.target.value)} />

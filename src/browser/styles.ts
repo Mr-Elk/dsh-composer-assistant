@@ -44,6 +44,10 @@ body[data-ds-dark-theme] .dsh-ia {--dsh-ia-fallback-bg:#232324;--dsh-ia-fallback
 .dsh-ia-row {display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin:2px 0}
 .dsh-ia-row label {display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:7px}
 .dsh-ia-field {display:flex;flex-direction:column;gap:5px;margin:6px 4px;font-size:12px;color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted))}
+.dsh-ia-group .dsh-ia-field {margin:0;gap:2px}
+.dsh-ia-field-title {font-size:14px;line-height:22px;font-weight:400;color:var(--dsw-alias-label-primary,var(--dsh-ia-fallback-fg))}
+.dsh-ia-field-hint {font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted))}
+.dsh-ia-field-block textarea {margin-top:6px}
 .dsh-ia-field input,.dsh-ia-field select,.dsh-ia select {min-height:26px;border:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border));border-radius:8px;background:var(--dsw-alias-bg-layer-1,var(--dsh-ia-fallback-bg));padding:0 8px;color:var(--dsw-alias-label-primary,var(--dsh-ia-fallback-fg))}
 .dsh-ia-field input,.dsh-ia-field textarea {width:100%}
 .dsh-ia-field textarea {border:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border));border-radius:8px;background:var(--dsw-alias-bg-layer-1,var(--dsh-ia-fallback-bg));padding:7px 9px;resize:vertical;min-height:64px;color:var(--dsw-alias-label-primary,var(--dsh-ia-fallback-fg))}

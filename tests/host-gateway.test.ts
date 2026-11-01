@@ -217,6 +217,34 @@ describe('real DSH Gateway / projection / LLM composition', () => {
     expect(f.adapter.requests).toHaveLength(2)
   })
 
+  it('shares one hourly budget across sessions while manual optimize stays available', async () => {
+    const f = await fixture()
+    complete(f.session, 1)
+    const first = await f.call<AssistantStatus>('status', { sessionId: f.session.id })
+    await f.call('settings/set', { hourlyCallLimit: 1 })
+    const allowed = await f.call<GenerationResult>('generate', generation(first, { requestId: 'budget-a' }))
+    expect(allowed.text).toBeTruthy()
+    expect(f.adapter.requests).toHaveLength(1)
+
+    const other = f.ctx.sessions.create(SessionId('budget-other'))
+    complete(other, 1)
+    const second = await f.call<AssistantStatus>('status', { sessionId: other.id })
+    const blocked = await f.call<GenerationResult>('generate', generation(second, {
+      requestId: 'budget-b', sessionId: other.id,
+    }))
+    expect(blocked.text).toBeNull()
+    expect(f.adapter.requests).toHaveLength(1)
+
+    // Manual optimize is an explicit action and must not be swallowed by the budget.
+    const draft = '解释缓存失效，不改接口'
+    const optimized = await f.call<GenerationResult>('generate', generation(second, {
+      requestId: 'budget-opt', sessionId: other.id, operation: 'optimize', draft,
+      span: { start: 0, end: draft.length, draftRev: 1 },
+    }))
+    expect(optimized.text).toBeTruthy()
+    expect(f.adapter.requests).toHaveLength(2)
+  })
+
   it('rejects a non-owner principal before dispatch', async () => {
     const f = await fixture()
     const stranger = new Peer(f.ctx, { principal: { kind: 'user' } as never })

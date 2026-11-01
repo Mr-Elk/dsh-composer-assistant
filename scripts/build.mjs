@@ -15,7 +15,7 @@ const client = await build({ entryPoints: [browserEntry], bundle: true, write: f
     builder.onResolve({ filter: /^@deepseek-ai\/.*\/client$/ }, args => ({ path: args.path.replace(/\/client$/, ''), external: true }))
   }}], metafile: true })
 const code = client.outputFiles[0].text
-await writeFile('lib/client.js', `window.__ModuleLoader__.load({id:"dsh-composer-assist",factory:(require)=>{\nvar module={exports:{}};var exports=module.exports;\n${code}\nreturn module.exports;\n}});\n`)
+await writeFile('lib/client.js', `window.__ModuleLoader__.load({id:"dsh-composer-assistant",factory:(require)=>{\nvar module={exports:{}};var exports=module.exports;\n${code}\nreturn module.exports;\n}});\n`)
 await writeFile('lib/client.meta.json', JSON.stringify(client.metafile, null, 2))
 const tsc = resolve('node_modules/typescript/bin/tsc')
 const declaration = spawnSync(process.execPath, [tsc, '-p', 'tsconfig.build.json'], { stdio: 'inherit' })

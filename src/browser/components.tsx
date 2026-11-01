@@ -5,6 +5,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import { diffText } from '../core/diff'
+import { PLUGIN_VERSION } from '../core/version'
 import type { StoredDraft } from '../core/types'
 import { canUseTab, findEditor, measureGhost, type GhostGeometry } from './dom'
 import type { BrowserRuntime } from './runtime'
@@ -224,6 +225,14 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
           采纳后继续编辑 {state.metrics.editedAcceptances} 次，编辑字数约 {state.metrics.editedCharacters}，辅助调用 {state.metrics.calls} 次。</p>
         <div className="dsh-ia-muted">仅保留在本次插件运行内，不上传；忽略建议不会被视为负反馈。</div>
       </details>
+      <section className="dsh-ia-section">
+        <h4>关于</h4>
+        <div className="dsh-ia-row">
+          <span className="dsh-ia-muted">输入助手 v{PLUGIN_VERSION}</span>
+          <button type="button" disabled={state.updateChecking} onClick={() => { void controller.checkUpdate() }}>{state.updateChecking ? '检查中…' : '检查更新'}</button>
+        </div>
+        <p className="dsh-ia-muted">只查询 npm registry 的版本号；升级需要卸载后在插件管理里重新安装。</p>
+      </section>
       <p className="dsh-ia-muted">更多设置：DSH 设置 → 输入助手</p>
     </div>, document.body)}
   </div>

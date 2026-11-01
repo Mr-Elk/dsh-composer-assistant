@@ -9,7 +9,7 @@ import { BrowserRuntime, type ConnectionFace, type ModelDirectoryFace } from './
 import { STYLE_TEXT } from './styles'
 import { AssistantSettings } from './settings'
 
-export const name = 'composer-assist.client'
+export const name = 'composer-assistant.client'
 export const inject = ['slots', 'connection', 'modelDirectories']
 
 /** Slot registration stays inside the mounted fiber; unloading owns all timers and DOM. */
@@ -23,17 +23,17 @@ export function apply(ctx: Context): void {
     style.textContent = STYLE_TEXT
     document.head.append(style)
     return () => { runtime.dispose(); style.remove() }
-  }, 'composer-assist: browser lifetime')
+  }, 'composer-assistant: browser lifetime')
   ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
-    name: 'conversation.input.right', id: 'composer-assist', order: 40,
+    name: 'conversation.input.right', id: 'composer-assistant', order: 40,
     inject: () => ({ runtime }),
   }, AssistantRight))
   ctx.slots.inject('conversation.input.overlay', () => ctx.slots.register({
-    name: 'conversation.input.overlay', id: 'composer-assist', order: 40,
+    name: 'conversation.input.overlay', id: 'composer-assistant', order: 40,
     inject: () => ({ runtime }),
   }, AssistantOverlay))
   ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section', id: 'composer-assist', order: 65, label: '输入助手',
+    name: 'settings.section', id: 'composer-assistant', order: 65, label: '输入助手',
     inject: () => ({ runtime }),
   }, AssistantSettings))
 }

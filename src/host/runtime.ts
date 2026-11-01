@@ -5,7 +5,7 @@ import { Session, type SessionId } from '@deepseek-ai/dsh-session'
 import { BlockAssembler, type GenerateOptions } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-typert-registry'
-import { AssistantError, SessionScheduler, prepareGeneration, finishGeneration, type AssistantConfig, type AssistantStatus, type GenerationRequest, type GenerationResult, type ModelRoute } from '../core/index'
+import { AssistantError, SessionScheduler, prepareGeneration, finishGeneration, PLUGIN_NAME, PLUGIN_VERSION, PACKAGE_URL, type AssistantConfig, type AssistantStatus, type GenerationRequest, type GenerationResult, type ModelRoute, type UpdateCheckResult } from '../core/index'
 import { AssistantStorage } from './storage'
 import { emptyTranscript } from './transcript'
 import type { RpcPayload } from './rpc'
@@ -159,7 +159,37 @@ export class AssistantHostRuntime {
 
   cancel(id: string, requestId?: string): boolean { return this.scheduler.cancel(id, requestId) }
   changed(session: Session): void { this.scheduler.cancel(session.id) }
+  /** Reuse a recent registry answer so repeated clicks do not hammer npm. */
+  private async checkUpdate(signal: AbortSignal): Promise<UpdateCheckResult> {
+    if (this.updateCache && Date.now() - this.updateCache.at < 5 * 60_000) return this.updateCache.result
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 6000)
+    const abort = () => controller.abort()
+    signal.addEventListener('abort', abort, { once: true })
+    let result: UpdateCheckResult
+    try {
+      const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(PLUGIN_NAME)}/latest`, {
+        signal: controller.signal, headers: { accept: 'application/json' },
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const body = await response.json() as { version?: unknown }
+      const latest = typeof body.version === 'string' ? body.version : null
+      result = { current: PLUGIN_VERSION, latest, url: PACKAGE_URL, error: latest ? null : 'EMPTY' }
+    } catch (error) {
+      if (signal.aborted) throw error
+      if (controller.signal.aborted && !signal.aborted) result = { current: PLUGIN_VERSION, latest: null, url: PACKAGE_URL, error: 'TIMEOUT' }
+      else result = { current: PLUGIN_VERSION, latest: null, url: PACKAGE_URL, error: 'NETWORK' }
+    } finally {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', abort)
+    }
+    this.updateCache = { at: Date.now(), result }
+    return result
+  }
+
   dispose(): void { this.disposed = true; this.scheduler.dispose() }
+
+  private updateCache: { at: number; result: UpdateCheckResult } | null = null
 
   async invoke(payload: RpcPayload, signal: AbortSignal): Promise<unknown> {
     signal.throwIfAborted()
@@ -177,6 +207,7 @@ export class AssistantHostRuntime {
         return result
       }
       case 'status': return this.status(sessionRequest.parse(payload.data).sessionId, signal)
+      case 'update/check': return this.checkUpdate(signal)
       case 'cancel': {
         const request = z.object({ sessionId: stringId, requestId: stringId.optional() }).parse(payload.data)
         await this.session(request.sessionId, signal)

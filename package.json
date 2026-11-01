@@ -1,10 +1,10 @@
 {
-  "name": "dsh-composer-assist",
-  "version": "0.2.0-local.13",
-  "description": "DSH 输入助手（本地 fork）：提示词优化、下一句预测、输入续写与当前会话草稿暂存",
+  "name": "dsh-composer-assistant",
+  "version": "0.2.0",
+  "description": "DSH 输入助手：下一句预测、输入续写、提示词优化与草稿暂存（dsh-input-assistant 的增强 fork）",
   "type": "module",
   "license": "MIT",
-  "author": "local fork of dsh-input-assistant contributors",
+  "author": "dsh-input-assistant contributors (fork)",
   "keywords": [
     "dsh",
     "deepseek-harness",
@@ -16,14 +16,6 @@
     "next-sentence-prediction",
     "cordis"
   ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Somnus678/dsh-input-assistant.git"
-  },
-  "homepage": "https://github.com/Somnus678/dsh-input-assistant#readme",
-  "bugs": {
-    "url": "https://github.com/Somnus678/dsh-input-assistant/issues"
-  },
   "engines": {
     "node": ">=22.19",
     "dsh": ">=0.2.1-rc.2 <0.3.0-0"
@@ -63,6 +55,11 @@
         "@deepseek-ai/dsh-client-ui-settings"
       ],
       "platform": "web"
+    },
+    "compatibility": {
+      "dshReleases": {
+        "0.2.1-rc.3": "compatible"
+      }
     }
   },
   "scripts": {
@@ -121,5 +118,9 @@
   },
   "dependencies": {
     "zod": "4.4.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

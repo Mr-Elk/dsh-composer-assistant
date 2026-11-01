@@ -5,6 +5,7 @@ import {
 import { focusedIn, nativeMenuOpen, selectedPlainText, type ReferenceOccurrence } from './dom'
 import { snapshotMatches } from '../core/snapshot'
 import { charCount } from '../core/context'
+import { compareVersions, type UpdateCheckResult } from '../core/version'
 
 export interface BrowserInput {
   draft: string; draftRev: number; phase: string
@@ -40,6 +41,7 @@ export interface BrowserState {
   locked: readonly string[]
   connected: boolean
   settingsSaving: boolean
+  updateChecking: boolean
   metrics: UsageMetrics
 }
 export interface UsageMetrics { exposures: number; accepted: number; editedAcceptances: number; editedCharacters: number; calls: number; totalLatencyMs: number }
@@ -51,7 +53,7 @@ interface ActiveRequest {
   latencyRecorded: boolean
 }
 const initial = (): BrowserState => ({ status: null, settings: { ...DEFAULT_CONFIG }, busy: null,
-  notice: '', suggestion: null, change: null, drafts: [], locked: [], connected: false, settingsSaving: false, metrics: emptyMetrics() })
+  notice: '', suggestion: null, change: null, drafts: [], locked: [], connected: false, settingsSaving: false, updateChecking: false, metrics: emptyMetrics() })
 
 /** One controller per mounted composer. Right/overlay surfaces consume this same store. */
 export class InputAssistantController {
@@ -178,6 +180,23 @@ export class InputAssistantController {
   }
   dismissSuggestion(): void { this.clearTimer(); this.cancelActive(); this.patch({ suggestion: null }); this.suppressUntilEdit = this.binding?.input.draft ?? '' }
   clearNotice(): void { this.patch({ notice: '' }) }
+
+  /** Manual, on-demand update check; never downloads or installs anything. */
+  async checkUpdate(): Promise<void> {
+    if (this.state.updateChecking || this.disposed) return
+    this.patch({ updateChecking: true })
+    try {
+      const result = await this.transport.call<UpdateCheckResult>('update/check', {}, this.lifecycle.signal)
+      const message = result.error
+        ? '检查更新失败，请稍后再试'
+        : result.latest && compareVersions(result.latest, result.current) > 0
+          ? `有新版本 ${result.latest}（当前 ${result.current}）：请卸载后在插件管理里重新安装`
+          : `已是最新版本 ${result.current}`
+      this.patch({ updateChecking: false, notice: message })
+    } catch {
+      if (!this.disposed) this.patch({ updateChecking: false, notice: '检查更新失败，请稍后再试' })
+    }
+  }
   notice(text: string): void { this.patch({ notice: text }) }
 
   async refresh(): Promise<void> {

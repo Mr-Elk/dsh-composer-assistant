@@ -4,7 +4,7 @@ import { gunzipSync } from 'node:zlib'
 import vm from 'node:vm'
 import { createRequire } from 'node:module'
 
-const files = (await readdir('dist')).filter(f => /^dsh-composer-assist-.*\.tgz$/.test(f)).sort()
+const files = (await readdir('dist')).filter(f => /^dsh-composer-assistant-.*\.tgz$/.test(f)).sort()
 assert.ok(files.length, 'Run pnpm pack --pack-destination dist first')
 const archive = process.argv[2] || `dist/${files.at(-1)}`
 const tar = gunzipSync(await readFile(archive))
@@ -24,7 +24,7 @@ assert.equal(pkg.engines.dsh, '>=0.2.1-rc.2 <0.3.0-0')
 assert.equal(pkg.dsh.bundle.patch, './cordis.patch.yml')
 let module
 vm.runInNewContext(entries.get('package/lib/client.js'), { window: { __ModuleLoader__: { load: value => { module = value } } } })
-assert.equal(module.id, 'dsh-composer-assist')
+assert.equal(module.id, 'dsh-composer-assistant')
 const require = createRequire(import.meta.url)
 const client = module.factory(id => require(id))
 assert.equal(typeof client.apply, 'function')

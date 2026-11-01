@@ -20,4 +20,5 @@ rm -f dist/*.tgz
 pnpm pack --pack-destination dist >/dev/null
 cp dist/*.tgz "$src/dist/"
 ver=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")
-echo "built: $src/dist/dsh-composer-assist-$ver.tgz"
+name=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).name")
+echo "built: $src/dist/$name-$ver.tgz"

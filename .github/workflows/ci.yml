@@ -83,7 +83,7 @@ jobs:
       - name: Upload packaged plugin
         uses: actions/upload-artifact@v4
         with:
-          name: dsh-composer-assist-tgz
+          name: dsh-composer-assistant-tgz
           path: dist/*.tgz
           if-no-files-found: error
           retention-days: 7

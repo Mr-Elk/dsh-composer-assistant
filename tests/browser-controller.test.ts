@@ -20,6 +20,7 @@ function fixture(text = '请改善这段说明', automatic = false) {
   let stored: StoredDraft[] = []
   let saveFailure = false
   let statusFailure = false
+  let updateResult: unknown = { current: '0.2.0', latest: '0.2.0', url: '', error: null }
   let delayedStatus: ReturnType<typeof deferred<AssistantStatus>> | null = null
   let delayedSave: ReturnType<typeof deferred<StoredDraft>> | null = null
   const pending: { request: GenerationRequest; signal?: AbortSignal; task: ReturnType<typeof deferred<GenerationResult>> }[] = []
@@ -52,6 +53,7 @@ function fixture(text = '请改善这段说明', automatic = false) {
       if (method === 'drafts/delete') { stored = stored.filter(item => item.id !== (data as { id: string }).id); return {} as T }
       if (method === 'drafts/clear') { stored = []; return {} as T }
       if (method === 'settings/set') { status = { ...status, settings: { ...status.settings, ...data as object } }; return status.settings as T }
+      if (method === 'update/check') return updateResult as T
       throw new Error(`Unexpected ${method}`)
     },
   }
@@ -80,6 +82,7 @@ function fixture(text = '请改善这段说明', automatic = false) {
     setReferences: () => { binding = { ...binding, input: { ...binding.input, occurrences: [{ offset: 0, length: 4 }] } }; controller.bind(binding) },
     failSave: () => { saveFailure = true }, delaySave: () => { delayedSave = deferred<StoredDraft>(); return delayedSave },
     failStatusOnce: () => { statusFailure = true },
+    setUpdate: (value: unknown) => { updateResult = value },
     delayStatus: () => { delayedStatus = deferred<AssistantStatus>(); return delayedStatus },
     resolve: (index: number, result: string | null) => pending[index].task.resolve({ ...pending[index].request, text: result }),
   }
@@ -166,6 +169,19 @@ describe('browser editor transactions', () => {
     expect(f.controller.getSnapshot().notice).toContain('模型超时')
     await vi.advanceTimersByTimeAsync(4000)
     expect(f.controller.getSnapshot().notice).toBe('')
+  })
+  it('reports update status from the host check without installing anything', async () => {
+    const f = fixture(); await f.controller.refresh()
+    f.setUpdate({ current: '0.2.0', latest: '0.3.0', url: 'https://www.npmjs.com/package/dsh-composer-assistant', error: null })
+    await f.controller.checkUpdate()
+    expect(f.controller.getSnapshot().notice).toContain('有新版本 0.3.0')
+    expect(f.controller.getSnapshot().updateChecking).toBe(false)
+    f.setUpdate({ current: '0.2.0', latest: '0.2.0', url: '', error: null })
+    await f.controller.checkUpdate()
+    expect(f.controller.getSnapshot().notice).toContain('已是最新版本 0.2.0')
+    f.setUpdate({ current: '0.2.0', latest: null, url: '', error: 'NETWORK' })
+    await f.controller.checkUpdate()
+    expect(f.controller.getSnapshot().notice).toContain('检查更新失败')
   })
   it('keeps an in-flight manual optimization alive across one failed status poll', async () => {
     const f = fixture(); await f.controller.refresh()

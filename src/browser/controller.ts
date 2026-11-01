@@ -5,6 +5,7 @@ import {
 import { focusedIn, nativeMenuOpen, selectedPlainText, type ReferenceOccurrence } from './dom'
 import { snapshotMatches } from '../core/snapshot'
 import { charCount } from '../core/context'
+import { suggestionCaps } from '../core/config'
 import { compareVersions, type UpdateCheckResult } from '../core/version'
 
 export interface BrowserInput {
@@ -418,30 +419,15 @@ export class InputAssistantController {
     if (span.start !== span.end || span.end !== binding.input.draft.length || !focusedIn(binding.editor)) { this.clearTimer(); return }
     const turn = status.sourceTurnId
     const route = this.routeKey(binding.route ?? status.route)
+    const caps = suggestionCaps(this.state.settings)
     if (binding.input.draft === '') {
       const turnKey = `${status.generation}:${turn}:${route}`
       if (!turn || !this.state.settings.nextEnabled || this.nextTurns.has(turnKey) || this.state.settings.nextTrigger === 'manual') {
         this.clearTimer(); return
       }
-      const delay = this.state.settings.nextDelayMs
-      if (delay <= 0) {
-        this.clearTimer()
-        this.markNextTurn(turnKey)
-        void this.requestSuggestion('next')
-        return
-      }
-      // Keep an already armed next timer; the 900ms status poll must not reset it.
-      if (this.timer !== undefined && this.timerKey === `next:${turnKey}`) return
       this.clearTimer()
-      this.timerKey = `next:${turnKey}`
-      this.timer = setTimeout(() => {
-        this.timer = undefined; this.timerKey = null
-        // The user may have started typing inside the delay window; a next-turn
-        // request would be rejected by the host and would burn the turn.
-        if (!this.eligible() || this.binding?.input.draft !== '') return
-        this.markNextTurn(turnKey)
-        void this.requestSuggestion('next')
-      }, delay)
+      this.markNextTurn(turnKey)
+      void this.requestSuggestion('next')
       return
     }
     if (!this.state.settings.completionEnabled || charCount(binding.input.draft) > this.state.settings.maxDraftChars) { this.clearTimer(); return }
@@ -450,7 +436,7 @@ export class InputAssistantController {
       this.clearTimer()
       const suffix = this.nextCache.text.slice(binding.input.draft.length)
       const snapshot = this.snapshot('complete', span)
-      if (suffix && charCount(suffix) <= this.state.settings.maxCompletionChars && snapshot) this.patch({ suggestion: { text: suffix, snapshot, kind: 'complete' } })
+      if (suffix && charCount(suffix) <= caps.complete && snapshot) this.patch({ suggestion: { text: suffix, snapshot, kind: 'complete' } })
       return
     }
     const cacheKey = this.completionKey()

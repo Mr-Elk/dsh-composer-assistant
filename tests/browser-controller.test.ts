@@ -127,30 +127,12 @@ describe('browser editor transactions', () => {
     // The regenerated turn is already marked, so polling must not request again.
     expect(f.pending).toHaveLength(2)
   })
-  it('drops a delayed next request when the draft changed first', async () => {
-    vi.useFakeTimers()
-    const f = fixture('', true)
-    f.setStatus({ settings: { ...DEFAULT_CONFIG, nextEnabled: true, completionEnabled: false, nextDelayMs: 500 } })
-    await f.controller.refresh(); await flush()
-    expect(f.pending).toHaveLength(0)
-    f.update('已经开始打字')
-    await vi.advanceTimersByTimeAsync(500); await flush()
-    expect(f.pending).toHaveLength(0)
-  })
-  it('honors manual trigger and request delay for next suggestions', async () => {
+  it('honors the manual trigger for next suggestions', async () => {
     vi.useFakeTimers()
     const manual = fixture('', true)
     manual.setStatus({ settings: { ...DEFAULT_CONFIG, nextEnabled: true, completionEnabled: false, nextTrigger: 'manual' } })
     await manual.controller.refresh(); await flush()
     expect(manual.pending).toHaveLength(0)
-
-    const delayed = fixture('', true)
-    delayed.setStatus({ settings: { ...DEFAULT_CONFIG, nextEnabled: true, completionEnabled: false, nextDelayMs: 500 } })
-    await delayed.controller.refresh(); await flush()
-    expect(delayed.pending).toHaveLength(0)
-    await vi.advanceTimersByTimeAsync(500); await flush()
-    expect(delayed.pending).toHaveLength(1)
-    expect(delayed.pending[0].request.operation).toBe('next')
   })
   it('auto-hides info notices and keeps error notices longer', async () => {
     vi.useFakeTimers()

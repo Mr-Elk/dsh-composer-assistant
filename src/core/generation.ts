@@ -1,6 +1,7 @@
 import { AssistantError, type AssistantConfig, type GenerationRequest, type HistoryMessage, type Operation } from './types'
 import { buildContext, charCount } from './context'
 import { protectText, restoreProtected, type ProtectedText } from './protection'
+import { OPTIMIZE_MAX_GROWTH, suggestionCaps } from './config'
 
 export const NO_SUGGESTION = '[[NO_SUGGESTION]]'
 export interface PreparedGeneration {
@@ -53,7 +54,7 @@ export function prepareGeneration(request: GenerationRequest, history: readonly 
       'Consider answering the latest question, a natural follow-up question, correcting a misunderstanding, or proceeding with an explicitly requested unfinished step.',
       'A question or correction is allowed when supported. Do not automatically propose commits, pushing, testing, or new features just because code was produced.',
       `If no single continuation is well-supported, or the task is naturally finished, output ${NO_SUGGESTION}. Do not guess an unresolved choice.`,
-      `Return one complete message the user would send, at most ${config.maxNextChars} characters. Prefer one or two sentences when the context supports it; do not pad, repeat the draft, or invent new requirements.`,
+      `Return one complete message the user would send, at most ${suggestionCaps(config).next} characters. Prefer one or two sentences when the context supports it; do not pad, repeat the draft, or invent new requirements.`,
       'Examples: user requested hit rate AND invalidation, only hit rate was explained -> 再解释一下缓存失效。',
       'User said explanation only, assistant proposes file edits -> 先不要改文件，请只解释原因。',
       `Assistant asks Redis or local cache, no preference in history -> ${NO_SUGGESTION}.`,
@@ -64,7 +65,7 @@ export function prepareGeneration(request: GenerationRequest, history: readonly 
       'The draft is the strongest constraint. Do not repeat its prefix, rewrite existing text, introduce a new topic, or answer the question.',
       'Preserve necessary leading whitespace in the suffix. A complete message does not need an arbitrary extra requirement.',
       `If the intended continuation is uncertain or the draft is already complete, output ${NO_SUGGESTION}.`,
-      `Return at most ${config.maxCompletionChars} characters, with no explanation.`,
+      `Return at most ${suggestionCaps(config).complete} characters, with no explanation.`,
       'Examples: draft 请解释这段代码的时间 -> 复杂度。',
       `Draft Please explain the cause without editing files. -> ${NO_SUGGESTION}.`,
     ].join('\n')
@@ -99,11 +100,12 @@ export function finishGeneration(raw: string, prepared: PreparedGeneration): str
     if (raw.includes(NO_SUGGESTION)) throw new AssistantError('OUTPUT', '模型输出不完整，已保留原稿')
     const output = restoreProtected(trimmed, prepared.protection!)
     const targetChars = charCount(prepared.request.targetText ?? prepared.request.draft)
-    const allowed = Math.max(Math.round(targetChars * prepared.config.optimizeMaxGrowth), targetChars + 200)
+    const allowed = Math.max(Math.round(targetChars * OPTIMIZE_MAX_GROWTH), targetChars + 200)
     if (charCount(output) > allowed || charCount(output) > prepared.config.maxDraftChars * 2) throw new AssistantError('OUTPUT', '优化结果过长，已保留原稿')
     return output
   }
-  const cap = prepared.operation === 'next' ? prepared.config.maxNextChars : prepared.config.maxCompletionChars
+  const caps = suggestionCaps(prepared.config)
+  const cap = prepared.operation === 'next' ? caps.next : caps.complete
   if (charCount(flattened) > cap || /^(?:```|\{\s*"|<think>|(?:建议|预测|续写|Suggestion|Prediction)\s*[:：])/i.test(trimmed) || trimmed.includes(NO_SUGGESTION)) return null
   if (prepared.operation === 'next') return trimmed
   if (trimmed.startsWith(prepared.request.draft.trim()) || prepared.request.draft.endsWith(flattened)) return null

@@ -3,6 +3,7 @@ export type Operation = 'optimize' | 'next' | 'complete'
 export interface TokenSpan { start: number; end: number; draftRev: number }
 export interface ModelRoute { provider: string; model: string }
 export type OptimizationStrength = 'light' | 'standard' | 'deep'
+export type SuggestionLength = 'short' | 'standard' | 'long'
 export interface AssistantConfig {
   optimizeEnabled: boolean
   stashEnabled: boolean
@@ -15,25 +16,21 @@ export interface AssistantConfig {
   minIntervalMs: number
   maxHistoryChars: number
   maxDraftChars: number
-  maxNextChars: number
-  maxCompletionChars: number
+  suggestionLength: SuggestionLength
   optimizeTimeoutMs: number
   suggestionTimeoutMs: number
   provider: string
   model: string
-  nextDelayMs: number
-  optimizeMaxGrowth: number
   temperature: number
-  reasoningEffort: string
   extraInstruction: string
 }
 export const DEFAULT_CONFIG: Readonly<AssistantConfig> = Object.freeze({
   optimizeEnabled: true, stashEnabled: true, optimizationStrength: 'standard',
-  nextEnabled: true, completionEnabled: true, displayMode: 'ghost', nextTrigger: 'auto', nextDelayMs: 0, optimizeMaxGrowth: 3,
+  nextEnabled: true, completionEnabled: true, displayMode: 'ghost', nextTrigger: 'auto',
   debounceMs: 600, minIntervalMs: 2000, maxHistoryChars: 16000,
-  maxDraftChars: 8000, maxNextChars: 120, maxCompletionChars: 80,
+  maxDraftChars: 8000, suggestionLength: 'standard',
   optimizeTimeoutMs: 60000, suggestionTimeoutMs: 15000, provider: '', model: '',
-  temperature: 0.7, reasoningEffort: '', extraInstruction: '',
+  temperature: 0.7, extraInstruction: '',
 })
 export interface InputSnapshot {
   requestId: string

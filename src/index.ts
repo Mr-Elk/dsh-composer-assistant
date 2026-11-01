@@ -17,16 +17,18 @@ export const Config = schema.object({
   optimizeEnabled: schema.boolean().default(true), stashEnabled: schema.boolean().default(true),
   optimizationStrength: schema.union(['light', 'standard', 'deep']).default('standard'),
   nextEnabled: schema.boolean().default(true), completionEnabled: schema.boolean().default(true),
+  nextTrigger: schema.union(['auto', 'manual']).default('auto'),
   displayMode: schema.union(['ghost', 'panel']).default('ghost'),
   debounceMs: schema.natural().min(200).max(5000).default(600),
   minIntervalMs: schema.natural().min(500).max(30000).default(2000),
   maxHistoryChars: schema.natural().min(1000).max(64000).default(16000),
   maxDraftChars: schema.natural().min(100).max(32000).default(8000),
-  maxNextChars: schema.natural().min(20).max(300).default(120),
-  maxCompletionChars: schema.natural().min(10).max(200).default(80),
+  suggestionLength: schema.union(['short', 'standard', 'long']).default('standard'),
   optimizeTimeoutMs: schema.natural().min(1000).max(120000).default(60000),
   suggestionTimeoutMs: schema.natural().min(1000).max(60000).default(15000),
   provider: schema.string().default(''), model: schema.string().default(''),
+  temperature: schema.number().min(0).max(2).default(0.7),
+  extraInstruction: schema.string().default(''),
 })
 
 declare module '@deepseek-ai/cordis' { interface Context { inputAssistant: InputAssistantService } }

@@ -80,17 +80,17 @@ describe('DSH input assistant settings section', () => {
     await firstRejected; await secondRejected
     expect(f.setters).toHaveLength(1)
   })
-  it('saves independent switches, strength and advanced limits through one reviewed update', async () => {
+  it('saves independent switches, strength and length preset through one reviewed update', async () => {
     const f = settingsFixture()
     await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
     fireEvent.click(screen.getByLabelText('提示词优化'))
     fireEvent.click(screen.getByLabelText('草稿暂存'))
     fireEvent.change(screen.getByLabelText('优化强度'), { target: { value: 'deep' } })
-    fireEvent.change(screen.getByLabelText('续写请求最小间隔（毫秒）'), { target: { value: '4000' } })
+    fireEvent.change(screen.getByLabelText('建议长度'), { target: { value: 'long' } })
     expect(f.setters).toHaveLength(0)
     fireEvent.click(screen.getByRole('button', { name: '保存设置' }))
     await screen.findByText('设置已保存并生效')
-    expect(f.setters).toEqual([{ optimizeEnabled: false, stashEnabled: false, optimizationStrength: 'deep', minIntervalMs: 4000 }])
+    expect(f.setters).toEqual([{ optimizeEnabled: false, stashEnabled: false, optimizationStrength: 'deep', suggestionLength: 'long' }])
     expect(f.settings().optimizationStrength).toBe('deep')
     expect((screen.getByRole('button', { name: '保存设置' }) as HTMLButtonElement).disabled).toBe(true)
   })
@@ -132,7 +132,7 @@ describe('DSH input assistant settings section', () => {
   it('validates blank and out-of-range advanced values without requesting a save', async () => {
     const f = settingsFixture()
     await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
-    fireEvent.change(screen.getByLabelText('续写停顿（毫秒）'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('温度'), { target: { value: '' } })
     fireEvent.submit(screen.getByRole('form', { name: '输入助手设置' }))
     await screen.findByRole('alert')
     expect(f.setters).toHaveLength(0)

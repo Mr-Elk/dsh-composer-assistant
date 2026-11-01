@@ -124,13 +124,10 @@ export class AssistantHostRuntime {
     const prepared = prepareGeneration(request, transcript.entries, settings)
     const text = await this.scheduler.run(request.sessionId, request.requestId, request.operation, prepared.timeoutMs, async active => {
       const call = await this.ctx.llm.prepareCall({ provider, model, maxTokens: prepared.maxOutputTokens, temperature: settings.temperature }, active, (controls, info) => {
-        // An explicit effort from settings wins; otherwise select the adapter's
-        // lowest advertised effort rather than inheriting a costly conversation
-        // default or assuming every model accepts "off".
-        const advertised = info.reasoning?.efforts ?? []
-        const requested = settings.reasoningEffort.trim()
-        const matched = requested ? advertised.find(item => item.id === requested) : undefined
-        const effort = matched?.id ?? advertised[0]?.id
+        // Auxiliary text tasks always take the adapter's lowest advertised effort
+        // rather than inheriting a costly conversation default or assuming every
+        // model accepts "off".
+        const effort = info.reasoning?.efforts[0]?.id
         return effort === undefined ? { ...controls } : { ...controls, reasoningEffort: effort }
       })
       active.throwIfAborted()

@@ -79,11 +79,11 @@ describe('stored settings survive version drift', () => {
   })
 
   it('falls back per field for corrupted values while keeping the rest', async () => {
-    const f = seeded({ ...DEFAULT_CONFIG, debounceMs: 'oops', optimizeEnabled: 'yes', maxNextChars: 99_999, displayMode: 'panel' })
+    const f = seeded({ ...DEFAULT_CONFIG, debounceMs: 'oops', optimizeEnabled: 'yes', suggestionLength: 'huge', displayMode: 'panel' })
     const settings = await f.storage.settings()
     expect(settings.debounceMs).toBe(600)
     expect(settings.optimizeEnabled).toBe(true)
-    expect(settings.maxNextChars).toBe(120)
+    expect(settings.suggestionLength).toBe('standard')
     expect(settings.displayMode).toBe('panel')
   })
 

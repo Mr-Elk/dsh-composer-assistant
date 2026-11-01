@@ -43,23 +43,22 @@ dsh plugin --profile desktop add ./dist/dsh-composer-assistant-0.2.0.tgz
 
 ## 设置
 
-设置 → 输入助手，分「功能 / 优化 / 建议 / 辅助模型 / 高级」五组：
+设置 → 输入助手，只暴露“要不要”和“风格”，实现参数保持默认：
 
-| 键 | 默认 | 说明 |
-| --- | --- | --- |
-| `optimizeEnabled` / `nextEnabled` / `completionEnabled` / `stashEnabled` | 开 | 四个功能独立开关 |
-| `optimizationStrength` | `standard` | 轻度润色 / 标准优化 / 深度梳理 |
-| `optimizeMaxGrowth` | 3 | 改写结果相对原稿的最大倍数，超限拒绝并保留原稿 |
-| `displayMode` | `ghost` | 灰字；超出可见高度自动转候选卡 |
-| `nextTrigger` / `nextDelayMs` | `auto` / 0 | 自动或手动触发；自动模式下的延迟 |
-| `maxNextChars` / `maxCompletionChars` | 120 / 80 | 建议长度上限 |
-| `temperature` / `reasoningEffort` | 0.7 / 空 | 采样温度；推理档留空取模型最低档 |
-| `extraInstruction` | 空 | 追加到系统提示词的额外要求（≤500 字） |
-| `provider` / `model` | 空 | 辅助模型；留空跟随输入框 |
-| `debounceMs` / `minIntervalMs` | 600 / 2000 | 续写防抖与请求间隔 |
-| `maxHistoryChars` / `maxDraftChars` | 16000 / 8000 | 上下文与草稿上限 |
-| `optimizeTimeoutMs` / `suggestionTimeoutMs` | 60000 / 15000 | 超时 |
+| 分组 | 项 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| 功能 | 提示词优化 / 回复后预测 / 输入续写 / 草稿暂存 | 开 | 四个功能独立开关 |
+| 建议 | 建议长度 | 标准 | 短 / 标准 / 长，内部映射为字符上限 |
+| 建议 | 触发方式 | 自动 | 自动每轮请求一次；手动只用菜单里的「换一条建议」 |
+| 优化 | 优化强度 | 标准 | 轻度润色 / 标准优化 / 深度梳理 |
+| 辅助模型 | 提供商 / 模型 | 跟随输入框 | 留空即跟随；辅助调用单独计费 |
+| 高级 | 温度 | 0.7 | 0.3 稳定 / 0.7 平衡 / 1.0 发散 |
+| 高级 | 额外指令 | 空 | 追加到系统提示词，≤500 字 |
 
+以下参数**不暴露**，由代码固定：续写防抖 600ms、最小请求间隔 2s、上下文上限 16000 字、
+草稿上限 8000 字、优化/建议超时 60s/15s、改写增长上限 3×、推理档自动取最低。
+
+输入框旁 `⌄` 菜单只放动作（保护选中、查看改动、草稿暂存、换一条、暂停、检查更新），不再重复设置项。
 提示气泡：信息类 6 秒、错误类 10 秒自动消失，点击或 `Esc` 立即关闭。
 
 ## 升级

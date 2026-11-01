@@ -111,10 +111,7 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
   const [open, setOpen] = useState(false)
   const menuPlacement = useFloatingPlacement(anchor, menuRef, open)
   const noticePlacement = useAboveCard(anchor, !open && Boolean(state.notice))
-  const [provider, setProvider] = useState(state.settings.provider)
-  const [modelId, setModelId] = useState(state.settings.model)
   useEffect(() => { void directory?.load().catch(() => {}) }, [directory])
-  useEffect(() => { setProvider(state.settings.provider); setModelId(state.settings.model) }, [state.settings.provider, state.settings.model])
   useLayoutEffect(() => {
     if (removed) { controller.dispose(); return }
     controller.bind({ sessionId, input, actions: inputActions, running, editor: findEditor(anchor.current), route: model.current ?? undefined })
@@ -171,13 +168,6 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
     {open && createPortal(<div ref={menuRef} className="dsh-ia dsh-ia-menu" aria-label="输入助手" style={menuPlacement ?? { visibility: 'hidden' }}>
       <div className="dsh-ia-menu-head"><strong>输入助手</strong><span className="dsh-ia-muted">采纳后由你发送</span></div>
       {state.settingsSaving && <div role="status">设置保存中…</div>}
-      <div className="dsh-ia-menu-rows">
-        <label className="dsh-ia-opt"><span>提示词优化</span><input className="dsh-ia-switch" type="checkbox" aria-label="提示词优化" disabled={state.settingsSaving} checked={state.settings.optimizeEnabled} onChange={event => { void controller.updateSettings({ optimizeEnabled: event.target.checked }) }} /></label>
-        <label className="dsh-ia-opt"><span>草稿暂存</span><input className="dsh-ia-switch" type="checkbox" aria-label="草稿暂存" disabled={state.settingsSaving} checked={state.settings.stashEnabled} onChange={event => { void controller.updateSettings({ stashEnabled: event.target.checked }) }} /></label>
-        <label className="dsh-ia-opt"><span>优化强度</span><select aria-label="优化强度" value={state.settings.optimizationStrength} disabled={state.settingsSaving || !state.settings.optimizeEnabled}
-          onChange={event => { void controller.updateSettings({ optimizationStrength: event.target.value as 'light' | 'standard' | 'deep' }) }}>
-          <option value="light">轻度润色</option><option value="standard">标准优化</option><option value="deep">深度梳理</option></select></label>
-      </div>
       {state.notice && <div className="dsh-ia-notice" role="status">{state.notice}</div>}
       <div className="dsh-ia-row">
         <button type="button" disabled={!canOptimize} onPointerDown={preserveSelection} onClick={() => controller.lockSelection()}>保护选中原文{state.locked.length ? ` (${state.locked.length})` : ''}</button>
@@ -205,21 +195,9 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
         {state.drafts.length > 0 && <button type="button" onClick={() => { void controller.clearDrafts() }}>清空暂存</button>}
       </section>
       <section className="dsh-ia-section">
-        <h4>输入建议</h4>
-        <div className="dsh-ia-menu-rows">
-          <label className="dsh-ia-opt"><span>回复后预测</span><input className="dsh-ia-switch" type="checkbox" aria-label="回复后预测" disabled={state.settingsSaving} checked={state.settings.nextEnabled} onChange={event => { void controller.updateSettings({ nextEnabled: event.target.checked }) }} /></label>
-          <label className="dsh-ia-opt"><span>输入续写</span><input className="dsh-ia-switch" type="checkbox" aria-label="输入续写" disabled={state.settingsSaving} checked={state.settings.completionEnabled} onChange={event => { void controller.updateSettings({ completionEnabled: event.target.checked }) }} /></label>
-          <label className="dsh-ia-opt"><span>显示方式</span><select aria-label="显示方式" disabled={state.settingsSaving} value={state.settings.displayMode} onChange={event => { void controller.updateSettings({ displayMode: event.target.value as 'ghost' | 'panel' }) }}>
-            <option value="ghost">灰字</option><option value="panel">候选面板</option></select></label>
-        </div>
+        <h4>建议</h4>
         <div className="dsh-ia-row"><button type="button" onClick={() => { void controller.regenerateSuggestion() }}>换一条建议</button><button type="button" onClick={() => controller.dismissSuggestion()}>暂停至下次编辑</button></div>
       </section>
-      <details className="dsh-ia-section"><summary>辅助模型设置</summary>
-        <div className="dsh-ia-muted">两项留空时跟随输入框模型；辅助调用单独消耗模型用量。</div>
-        <label className="dsh-ia-field">提供商<input disabled={state.settingsSaving} value={provider} onChange={event => setProvider(event.target.value)} placeholder="跟随输入框" autoComplete="off" /></label>
-        <label className="dsh-ia-field">模型<input disabled={state.settingsSaving} value={modelId} onChange={event => setModelId(event.target.value)} placeholder="跟随输入框" autoComplete="off" /></label>
-        <button type="button" disabled={state.settingsSaving} onClick={() => { void controller.updateSettings({ provider, model: modelId }) }}>保存模型设置</button>
-      </details>
       <details className="dsh-ia-section"><summary>本次使用统计</summary>
         <p className="dsh-ia-muted">当前会话：展示 {state.metrics.exposures} 次，采纳 {state.metrics.accepted} 次，
           采纳后继续编辑 {state.metrics.editedAcceptances} 次，编辑字数约 {state.metrics.editedCharacters}，辅助调用 {state.metrics.calls} 次。</p>

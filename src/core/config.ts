@@ -2,11 +2,24 @@ import { AssistantError, DEFAULT_CONFIG, type AssistantConfig } from './types'
 
 const numeric: Record<string, [number, number]> = {
   debounceMs: [200, 5000], minIntervalMs: [500, 30000], maxHistoryChars: [1000, 64000],
-  maxDraftChars: [100, 32000], maxNextChars: [20, 300], maxCompletionChars: [10, 200],
-  optimizeTimeoutMs: [1000, 120000], suggestionTimeoutMs: [1000, 60000], nextDelayMs: [0, 30000],
+  maxDraftChars: [100, 32000],
+  optimizeTimeoutMs: [1000, 120000], suggestionTimeoutMs: [1000, 60000],
 }
 const booleans = ['optimizeEnabled', 'stashEnabled', 'nextEnabled', 'completionEnabled'] as const
-const strings = ['provider', 'model', 'reasoningEffort', 'extraInstruction'] as const
+const strings = ['provider', 'model', 'extraInstruction'] as const
+
+/** User-facing length presets; the raw character caps stay internal. */
+export const SUGGESTION_CAPS: Record<'short' | 'standard' | 'long', { next: number; complete: number }> = {
+  short: { next: 60, complete: 40 },
+  standard: { next: 120, complete: 80 },
+  long: { next: 300, complete: 200 },
+}
+/** Optimization may not exceed this multiple of the target text (plus a small floor). */
+export const OPTIMIZE_MAX_GROWTH = 3
+
+export function suggestionCaps(config: Pick<AssistantConfig, 'suggestionLength'>): { next: number; complete: number } {
+  return SUGGESTION_CAPS[config.suggestionLength]
+}
 
 /** Validate one already-merged config object; throws with the first problem found. */
 function validate(config: AssistantConfig): AssistantConfig {
@@ -14,6 +27,7 @@ function validate(config: AssistantConfig): AssistantConfig {
     if (typeof config[key] !== 'boolean') throw new AssistantError('CONFIG', `${key} 必须是布尔值`)
   }
   if (!['ghost', 'panel'].includes(config.displayMode)) throw new AssistantError('CONFIG', '显示方式必须是 ghost 或 panel')
+  if (!['short', 'standard', 'long'].includes(config.suggestionLength)) throw new AssistantError('CONFIG', '建议长度必须是 short、standard 或 long')
   if (!['auto', 'manual'].includes(config.nextTrigger)) throw new AssistantError('CONFIG', '触发时机必须是 auto 或 manual')
   if (!['light', 'standard', 'deep'].includes(config.optimizationStrength)) throw new AssistantError('CONFIG', '优化强度必须是 light、standard 或 deep')
   for (const [key, [min, max]] of Object.entries(numeric)) {
@@ -29,9 +43,6 @@ function validate(config: AssistantConfig): AssistantConfig {
   }
   if (typeof config.temperature !== 'number' || !Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
     throw new AssistantError('CONFIG', 'temperature 必须是 0 到 2 之间的数字')
-  }
-  if (typeof config.optimizeMaxGrowth !== 'number' || !Number.isFinite(config.optimizeMaxGrowth) || config.optimizeMaxGrowth < 1 || config.optimizeMaxGrowth > 5) {
-    throw new AssistantError('CONFIG', 'optimizeMaxGrowth 必须是 1 到 5 之间的数字')
   }
   if (Boolean(config.provider) !== Boolean(config.model)) throw new AssistantError('CONFIG', '固定辅助模型需同时填写提供商和模型；留空则跟随输入框')
   return config

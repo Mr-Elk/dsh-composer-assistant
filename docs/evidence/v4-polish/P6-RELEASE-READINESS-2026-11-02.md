@@ -3,8 +3,9 @@
 ## Git
 
 - 分支：`release/0.3.0`
-- 提交：`38216f0 feat: 0.3.0 settings polish and i18n`
+- 提交：以 `git log -1 release/0.3.0` 为准；当前包含 0.3.0 功能、文档和 AppleDouble 排除
 - 工作区：干净
+- 测试前已清理 macOS `._*` 元数据；`vitest`/`tsconfig` 已排除 `**/._*`
 - 远程：已添加 `origin`（`https://github.com/Somnus678/dsh-input-assistant.git`），未推送
 - tag：尚未创建，等待最后一次真实宿主验收
 

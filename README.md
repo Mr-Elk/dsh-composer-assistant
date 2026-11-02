@@ -125,4 +125,4 @@ node scripts/smoke-web.mjs
 
 MIT。本项目基于 [`dsh-input-assistant`](https://github.com/Somnus678/dsh-input-assistant)（作者 Somnus678 与贡献者）修改，保留原 MIT 许可与版权声明；新增部分同样以 MIT 发布。
 
-本 fork：[`Mr-Elk/dsh-input-assistant`](https://github.com/Mr-Elk/dsh-input-assistant)
+本 fork：[`Mr-Elk/dsh-input-assistant`](https://github.com/Mr-Elk/dsh-composer-assistant)

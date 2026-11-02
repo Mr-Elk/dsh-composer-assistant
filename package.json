@@ -5,9 +5,9 @@
   "type": "module",
   "license": "MIT",
   "author": "dsh-input-assistant contributors (fork)",
-  "repository": { "type": "git", "url": "git+https://github.com/Somnus678/dsh-input-assistant.git" },
-  "homepage": "https://github.com/Somnus678/dsh-input-assistant#readme",
-  "bugs": { "url": "https://github.com/Somnus678/dsh-input-assistant/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/Mr-Elk/dsh-composer-assistant.git" },
+  "homepage": "https://github.com/Mr-Elk/dsh-composer-assistant#readme",
+  "bugs": { "url": "https://github.com/Mr-Elk/dsh-composer-assistant/issues" },
   "keywords": [
     "dsh",
     "deepseek-harness",

@@ -4,7 +4,6 @@
 
 不是自动回复，也不是替你发送。它只在输入框里给建议：`Tab` 采纳，`Esc` 忽略，最后发什么仍由你决定。
 
-<img src="docs/images/composer.png" alt="DSH 输入框里的优化按钮和设置齿轮" width="860">
 
 ## 0.3.0 的变化
 
@@ -28,13 +27,7 @@
 
 ## 界面
 
-| 中文设置页 | English |
-| --- | --- |
-| <img src="docs/images/settings-zh.png" alt="中文设置页" width="420"> | <img src="docs/images/settings-en.png" alt="English settings" width="420"> |
-
-| 齿轮弹窗 | 关于 |
-| --- | --- |
-| <img src="docs/images/popover.png" alt="齿轮弹窗和两行内联说明" width="420"> | <img src="docs/images/about.png" alt="关于输入助手" width="420"> |
+界面截图稍后只放设置页本身，不带账号、会话或输入内容。
 
 设置页按分组展示；输入框旁只放 `✦ 优化` 和 `⚙`。保护选中、查看改动、撤销、复制原文、换一条这些一次性动作在输入区就地出现，不塞进设置弹窗。
 

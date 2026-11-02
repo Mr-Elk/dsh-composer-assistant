@@ -6,10 +6,10 @@ import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import { TypertGatewayService } from '@deepseek-ai/dsh-api-gateway'
 import RemoteAccessService from '@deepseek-ai/dsh-api-remote-access'
 import { Peer } from '@deepseek-ai/dsh-client-connection'
-import LlmRuntime, { createAssistantMessage, createUserMessage, LlmAdapter, ReasoningEffortId, type GenerateOptions, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createAssistantMessage, createUserMessage, LlmAdapter, ReasoningEffortId, type GenerateOptions, type LlmModelInfo, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { Domain, DomainSpec } from '@deepseek-ai/dsh-storage-domain'
 import * as plugin from '../src/index'
-import type { AssistantStatus, GenerationRequest, GenerationResult, StoredDraft } from '../src/core/types'
+import type { AssistantStatus, GenerationRequest, GenerationResult, ModelCatalog } from '../src/core/types'
 
 class TestStorageDomain extends Service {
   private readonly records = new Map<string, unknown>()
@@ -40,6 +40,9 @@ class TestAdapter extends LlmAdapter {
     return { provider, id, name: 'Local fixture', reasoning: { efforts: [
       { id: ReasoningEffortId('fixture-low'), name: 'Low' }, { id: ReasoningEffortId('fixture-high'), name: 'High' },
     ] } }
+  }
+  async listModels(provider: string): Promise<readonly LlmModelInfo[]> {
+    return [{ provider, id: 'model', name: 'Fixture Model' }]
   }
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     this.requests.push(options)
@@ -115,6 +118,13 @@ describe('real DSH Gateway / projection / LLM composition', () => {
     expect(f.session.seq).toBe(before)
   })
 
+  it('lists configured models through the read-only catalog', async () => {
+    const f = await fixture()
+    const catalog = await f.call<ModelCatalog>('models/list', {})
+    expect(catalog.failures).toEqual([])
+    expect(catalog.models).toContainEqual(expect.objectContaining({ provider: 'fixture', model: 'model', name: 'Fixture Model' }))
+  })
+
   it('rejects late generation when a new real session turn arrives', async () => {
     const f = await fixture()
     complete(f.session, 1)
@@ -172,34 +182,22 @@ describe('real DSH Gateway / projection / LLM composition', () => {
     expect(f.session.seq).toBe(before)
   })
 
-  it('uses durable plugin-owned settings and session-isolated drafts through the Gateway', async () => {
+  it('uses durable plugin-owned settings through the Gateway', async () => {
     const f = await fixture()
     await f.call('settings/set', { displayMode: 'panel', nextEnabled: false })
-    const saved = await f.call<StoredDraft[]>('drafts/save', { sessionId: f.session.id, text: '先暂存的长提示词' })
-    expect(saved).toHaveLength(1)
     expect((await f.call<AssistantStatus>('status', { sessionId: f.session.id })).settings.displayMode).toBe('panel')
-    const other = f.ctx.sessions.create(SessionId('another'))
-    expect(await f.call('drafts/list', { sessionId: other.id })).toEqual([])
-    expect(await f.call('drafts/list', { sessionId: f.session.id })).toEqual(saved)
-    await f.call('drafts/clear', { sessionId: f.session.id })
-    expect(await f.call('drafts/list', { sessionId: f.session.id })).toEqual([])
+    expect((await f.call<AssistantStatus>('status', { sessionId: f.session.id })).settings.nextEnabled).toBe(false)
   })
 
-  it('blocks disabled manual capabilities on the Host before any model call while retaining draft management', async () => {
+  it('blocks disabled manual capabilities on the Host before any model call', async () => {
     const f = await fixture()
-    const saved = await f.call<StoredDraft[]>('drafts/save', { sessionId: f.session.id, text: '关闭前保存的草稿' })
-    await f.call('settings/set', { optimizeEnabled: false, stashEnabled: false, optimizationStrength: 'deep' })
+    await f.call('settings/set', { optimizeEnabled: false, optimizationStrength: 'deep' })
     const status = await f.call<AssistantStatus>('status', { sessionId: f.session.id })
-    expect(status.settings).toMatchObject({ optimizeEnabled: false, stashEnabled: false, optimizationStrength: 'deep' })
+    expect(status.settings).toMatchObject({ optimizeEnabled: false, optimizationStrength: 'deep' })
     const draft = '解释缓存，不改文件'
     await expect(f.call('generate', generation(status, { operation: 'optimize', draft,
       span: { start: 0, end: draft.length, draftRev: 1 } }))).rejects.toMatchObject({ details: { code: 'DISABLED' } })
     expect(f.adapter.requests).toHaveLength(0)
-    await expect(f.call('drafts/save', { sessionId: f.session.id, text: '关闭后不能保存' }))
-      .rejects.toMatchObject({ details: { code: 'DISABLED' } })
-    expect(await f.call('drafts/list', { sessionId: f.session.id })).toEqual(saved)
-    expect(await f.call('drafts/delete', { sessionId: f.session.id, id: saved[0]!.id })).toEqual([])
-    expect(await f.call('drafts/clear', { sessionId: f.session.id })).toEqual([])
   })
 
   it('honors regenerate through the strict request schema instead of dropping it', async () => {

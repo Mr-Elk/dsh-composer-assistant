@@ -16,7 +16,8 @@ export const inject = ['slots', 'connection', 'modelDirectories']
 export function apply(ctx: Context): void {
   const connection = ctx.get('connection') as unknown as ConnectionFace
   const models = ctx.get('modelDirectories' as never) as ModelDirectoryFace | undefined
-  const runtime = new BrowserRuntime(connection, models)
+  const locale = ctx.get('locale' as never) as { getLocale(): { active: string } } | undefined
+  const runtime = new BrowserRuntime(connection, models, locale ? () => locale.getLocale().active : undefined)
   ctx.effect(() => {
     const style = document.createElement('style')
     style.dataset.dshInputAssistant = ''

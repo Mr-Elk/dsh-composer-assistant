@@ -1,9 +1,10 @@
 import { build } from 'esbuild'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
+await rm('lib', { recursive: true, force: true })
 await mkdir('lib', { recursive: true })
 const shared = ['@deepseek-ai/*', 'react', 'react/*', 'react-dom', 'react-dom/*', 'zod', 'zod/*']
 await build({ entryPoints: { index: 'src/index.ts', core: 'src/core/index.ts' }, outdir: 'lib',

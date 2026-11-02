@@ -13,7 +13,7 @@ export const name = 'input-assistant-desktop-probe'
 export const inject = ['inputAssistant', 'typertGateway', 'connection', 'sessions', 'loader']
 
 const cache = resolve(fileURLToPath(new URL('../../', import.meta.url)), '.test-runtime')
-const allowed = new Set(['settings/get', 'status', 'drafts/list', 'drafts/save', 'drafts/delete', 'drafts/clear'])
+const allowed = new Set(['settings/get', 'status'])
 
 export async function apply(ctx, config) {
   const reportPath = resolve(config.reportPath)
@@ -60,20 +60,6 @@ export async function apply(ctx, config) {
     assert.equal(status.sourceTurnId, null)
     assert.equal(typeof status.generation, 'string')
     report.checks.emptySessionStatus = true
-    assert.deepEqual(await call('drafts/list', { sessionId: session.id }), [])
-    const text = '桌面宿主零 token 探测 😀\n只读状态与独立草稿'
-    const saved = await call('drafts/save', { sessionId: session.id, text })
-    assert.equal(saved.length, 1)
-    assert.equal(saved[0].text, text)
-    assert.deepEqual(await call('drafts/list', { sessionId: session.id }), saved)
-    report.checks.durableDraftRoundTrip = true
-    assert.deepEqual(await call('drafts/delete', { sessionId: session.id, id: saved[0].id }), [])
-    assert.deepEqual(await call('drafts/list', { sessionId: session.id }), [])
-    report.checks.singleDelete = true
-    await call('drafts/save', { sessionId: session.id, text: '待清理的测试草稿' })
-    assert.deepEqual(await call('drafts/clear', { sessionId: session.id }), [])
-    assert.deepEqual(await call('drafts/list', { sessionId: session.id }), [])
-    report.checks.clearDrafts = true
     assert.equal(session.seq, initialSeq, 'The probe must not append to even its temporary conversation')
     report.checks.noSessionEvents = true
     report.passed = true
@@ -82,23 +68,16 @@ export async function apply(ctx, config) {
     report.error = { name: error?.name ?? 'Error', code: error?.code ?? 'PROBE_FAILED',
       message: error?.name === 'AssertionError' ? String(error.message).slice(0, 800) : 'Desktop host probe failed; inspect its non-sensitive runtime diagnostics.' }
   } finally {
-    let cleared = !session
     let detached = !detach
     let peerDisposed = !peer
-    if (session && peer) {
-      try {
-        await call('drafts/clear', { sessionId: session.id })
-        cleared = (await call('drafts/list', { sessionId: session.id })).length === 0
-      } catch { /* Cleanup failure is reported, never hidden by a success. */ }
-    }
     if (detach) {
       try { detach(); detached = ctx.sessions.get(session.id) === undefined } catch { /* reported */ }
     }
     if (peer) {
       try { await peer.dispose(); peerDisposed = true } catch { /* reported */ }
     }
-    report.cleanup = { cleared, detached, peerDisposed }
-    report.cleaned = cleared && detached && peerDisposed
+    report.cleanup = { detached, peerDisposed }
+    report.cleaned = detached && peerDisposed
     report.passed &&= report.cleaned
     report.finishedAt = new Date().toISOString()
     await mkdir(dirname(reportPath), { recursive: true })

@@ -4,14 +4,14 @@ export interface TokenSpan { start: number; end: number; draftRev: number }
 export interface ModelRoute { provider: string; model: string }
 export type OptimizationStrength = 'light' | 'standard' | 'deep'
 export type SuggestionLength = 'short' | 'standard' | 'long'
+export type AssistantLanguage = 'follow' | 'zh' | 'en'
 export interface AssistantConfig {
   optimizeEnabled: boolean
-  stashEnabled: boolean
   optimizationStrength: OptimizationStrength
   nextEnabled: boolean
   completionEnabled: boolean
   displayMode: 'ghost' | 'panel'
-  nextTrigger: 'auto' | 'manual'
+  language: AssistantLanguage
   debounceMs: number
   minIntervalMs: number
   maxHistoryChars: number
@@ -26,8 +26,8 @@ export interface AssistantConfig {
   extraInstruction: string
 }
 export const DEFAULT_CONFIG: Readonly<AssistantConfig> = Object.freeze({
-  optimizeEnabled: true, stashEnabled: true, optimizationStrength: 'standard',
-  nextEnabled: true, completionEnabled: true, displayMode: 'ghost', nextTrigger: 'auto',
+  optimizeEnabled: true, optimizationStrength: 'standard',
+  nextEnabled: true, completionEnabled: true, displayMode: 'ghost', language: 'follow',
   debounceMs: 600, minIntervalMs: 2000, maxHistoryChars: 16000,
   maxDraftChars: 8000, suggestionLength: 'standard',
   optimizeTimeoutMs: 60000, suggestionTimeoutMs: 15000, provider: '', model: '',
@@ -70,9 +70,18 @@ export interface AssistantStatus {
   generation: string
   route?: ModelRoute
 }
-export interface StoredDraft { id: string; text: string; createdAt: number }
+export interface ModelOption {
+  provider: string
+  providerName: string
+  model: string
+  name: string
+}
+export interface ModelCatalog {
+  models: ModelOption[]
+  failures: { provider: string; message: string }[]
+}
 export const RPC_CHANNEL = '/api'
 export const RPC_PREFIX = 'input-assistant/'
 export class AssistantError extends Error {
-  constructor(public readonly code: string, message: string) { super(message); this.name = 'AssistantError' }
+  constructor(public readonly code: string, message: string, public readonly params?: Record<string, string | number>) { super(message); this.name = 'AssistantError' }
 }

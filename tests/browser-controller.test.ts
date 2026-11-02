@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_CONFIG, type AssistantStatus, type GenerationRequest, type GenerationResult, type StoredDraft, type TokenSpan } from '../src/core/types'
+import { DEFAULT_CONFIG, type AssistantStatus, type GenerationRequest, type GenerationResult, type TokenSpan } from '../src/core/types'
 import { InputAssistantController, type BrowserBinding, type BrowserTransport } from '../src/browser/controller'
+import { InputAssistantRequestError } from '../src/browser/runtime'
 
 function deferred<T>() { let resolve!: (value: T) => void, reject!: (error: Error) => void; const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej }); return { promise, resolve, reject } }
 const flush = async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() }
 const controllers: InputAssistantController[] = []
 afterEach(() => { controllers.splice(0).forEach(controller => controller.dispose()); document.body.innerHTML = ''; vi.useRealTimers() })
 
-function fixture(text = '请改善这段说明', automatic = false) {
+function fixture(text = '请改善这段说明', automatic = false, locale?: () => string) {
   document.body.innerHTML = '<div data-composer-card><div contenteditable="true" tabindex="0" data-composer-input></div></div>'
   const editor = document.querySelector<HTMLElement>('[data-composer-input]')!
   editor.textContent = text
@@ -17,12 +18,9 @@ function fixture(text = '请改善这段说明', automatic = false) {
   let status: AssistantStatus = { sourceTurnId: 'turn-1', generation: 'mount-1', running: false,
     settings: { ...DEFAULT_CONFIG, nextEnabled: automatic, completionEnabled: automatic }, route: { provider: 'mock', model: 'fast' } }
   let span: TokenSpan = { start: text.length, end: text.length, draftRev: 1 }
-  let stored: StoredDraft[] = []
-  let saveFailure = false
   let statusFailure = false
-  let updateResult: unknown = { current: '0.2.0', latest: '0.2.0', url: '', error: null }
+  let generateError: Error | null = null
   let delayedStatus: ReturnType<typeof deferred<AssistantStatus>> | null = null
-  let delayedSave: ReturnType<typeof deferred<StoredDraft>> | null = null
   const pending: { request: GenerationRequest; signal?: AbortSignal; task: ReturnType<typeof deferred<GenerationResult>> }[] = []
   const calls: { method: string; data: unknown }[] = []
   const insertText = vi.fn((value: string, target: TokenSpan) => {
@@ -39,25 +37,16 @@ function fixture(text = '请改善这段说明', automatic = false) {
     async call<T>(method: string, data: unknown, signal?: AbortSignal): Promise<T> {
       calls.push({ method, data })
       if (method === 'status') { if (statusFailure) { statusFailure = false; throw new Error('status temporarily unavailable') }; return delayedStatus ? delayedStatus.promise as Promise<T> : status as T }
-      if (method === 'generate') { const task = deferred<GenerationResult>(); pending.push({ request: data as GenerationRequest, signal, task }); return task.promise as Promise<T> }
-      if (method === 'cancel') return {} as T
-      if (method === 'drafts/list') return stored as T
-      if (method === 'drafts/save') {
-        if (saveFailure) throw new Error('保存失败')
-        const value = data as { text: string; replaceId?: string }
-        const draft = { id: value.replaceId ?? 'draft-1', text: value.text, createdAt: Date.now() }
-        if (delayedSave) await delayedSave.promise
-        stored = [...stored.filter(item => item.id !== draft.id), draft]
-        return draft as T
+      if (method === 'generate') {
+        if (generateError) { const error = generateError; generateError = null; throw error }
+        const task = deferred<GenerationResult>(); pending.push({ request: data as GenerationRequest, signal, task }); return task.promise as Promise<T>
       }
-      if (method === 'drafts/delete') { stored = stored.filter(item => item.id !== (data as { id: string }).id); return {} as T }
-      if (method === 'drafts/clear') { stored = []; return {} as T }
+      if (method === 'cancel') return {} as T
       if (method === 'settings/set') { status = { ...status, settings: { ...status.settings, ...data as object } }; return status.settings as T }
-      if (method === 'update/check') return updateResult as T
       throw new Error(`Unexpected ${method}`)
     },
   }
-  const controller = new InputAssistantController('session-a', transport)
+  const controller = new InputAssistantController('session-a', transport, undefined, undefined, locale)
   controllers.push(controller)
   function select(start: number, end = start) {
     span = { start, end, draftRev: binding.input.draftRev }
@@ -80,35 +69,14 @@ function fixture(text = '请改善这段说明', automatic = false) {
     setGeneration: (value: string | null) => { generation = value; controller.bind(binding) },
     setAttachments: () => { binding = { ...binding, input: { ...binding.input, attachmentIds: ['image'] } }; controller.bind(binding) },
     setReferences: () => { binding = { ...binding, input: { ...binding.input, occurrences: [{ offset: 0, length: 4 }] } }; controller.bind(binding) },
-    failSave: () => { saveFailure = true }, delaySave: () => { delayedSave = deferred<StoredDraft>(); return delayedSave },
     failStatusOnce: () => { statusFailure = true },
-    setUpdate: (value: unknown) => { updateResult = value },
+    failGenerate: (error: Error) => { generateError = error },
     delayStatus: () => { delayedStatus = deferred<AssistantStatus>(); return delayedStatus },
     resolve: (index: number, result: string | null) => pending[index].task.resolve({ ...pending[index].request, text: result }),
   }
 }
 
 describe('browser editor transactions', () => {
-  it('rejects an old status reply after disabling stash and does not clear a late saved draft', async () => {
-    const f = fixture(); await f.controller.refresh()
-    const oldStatus = f.controller.getSnapshot().status!, saved = f.delaySave()
-    const stash = f.controller.stash()
-    const delayedStatus = f.delayStatus(), refresh = f.controller.refresh()
-    await f.controller.updateSettings({ stashEnabled: false })
-    delayedStatus.resolve(oldStatus); await refresh
-    expect(f.controller.getSnapshot().settings.stashEnabled).toBe(false)
-    saved.resolve({ id: 'draft-1', text: '', createdAt: 0 }); await stash
-    expect(f.insertText).not.toHaveBeenCalled()
-    expect(f.controller.getSnapshot().drafts).toHaveLength(1)
-  })
-  it('preserves the input if a pending stash finishes during settings review', async () => {
-    const f = fixture(); await f.controller.refresh(); const saved = f.delaySave()
-    const stash = f.controller.stash(); f.controller.beginSettingsUpdate()
-    saved.resolve({ id: 'draft-1', text: '', createdAt: 0 }); await stash
-    expect(f.insertText).not.toHaveBeenCalled()
-    expect(f.binding.input.draft).toBe('请改善这段说明')
-    f.controller.endSettingsUpdate()
-  })
   it('regenerates the next suggestion for the same turn on demand', async () => {
     vi.useFakeTimers()
     const f = fixture('', true)
@@ -126,13 +94,6 @@ describe('browser editor transactions', () => {
     await f.controller.refresh(); await flush()
     // The regenerated turn is already marked, so polling must not request again.
     expect(f.pending).toHaveLength(2)
-  })
-  it('honors the manual trigger for next suggestions', async () => {
-    vi.useFakeTimers()
-    const manual = fixture('', true)
-    manual.setStatus({ settings: { ...DEFAULT_CONFIG, nextEnabled: true, completionEnabled: false, nextTrigger: 'manual' } })
-    await manual.controller.refresh(); await flush()
-    expect(manual.pending).toHaveLength(0)
   })
   it('auto-hides info notices and keeps error notices longer', async () => {
     vi.useFakeTimers()
@@ -152,19 +113,23 @@ describe('browser editor transactions', () => {
     await vi.advanceTimersByTimeAsync(4000)
     expect(f.controller.getSnapshot().notice).toBe('')
   })
-  it('reports update status from the host check without installing anything', async () => {
-    const f = fixture(); await f.controller.refresh()
-    f.setUpdate({ current: '0.2.0', latest: '0.3.0', url: 'https://www.npmjs.com/package/dsh-composer-assistant', error: null })
-    await f.controller.checkUpdate()
-    expect(f.controller.getSnapshot().notice).toContain('有新版本 0.3.0')
-    expect(f.controller.getSnapshot().updateChecking).toBe(false)
-    f.setUpdate({ current: '0.2.0', latest: '0.2.0', url: '', error: null })
-    await f.controller.checkUpdate()
-    expect(f.controller.getSnapshot().notice).toContain('已是最新版本 0.2.0')
-    f.setUpdate({ current: '0.2.0', latest: null, url: '', error: 'NETWORK' })
-    await f.controller.checkUpdate()
-    expect(f.controller.getSnapshot().notice).toContain('检查更新失败')
+  it('localizes controller notices from the active language', async () => {
+    const f = fixture('', false, () => 'en')
+    f.setStatus({ settings: { ...DEFAULT_CONFIG, language: 'en', nextEnabled: false } })
+    await f.controller.refresh()
+    await f.controller.updateSettings({ nextEnabled: true })
+    expect(f.controller.getSnapshot().notice).toBe('Settings saved.')
   })
+
+  it('maps host error codes to localized controller notices', async () => {
+    const f = fixture('原稿', false, () => 'en')
+    f.setStatus({ settings: { ...DEFAULT_CONFIG, language: 'en' } })
+    await f.controller.refresh()
+    f.failGenerate(new InputAssistantRequestError('MODEL', '请先在 DSH 输入框选择可用模型'))
+    await f.controller.optimize()
+    expect(f.controller.getSnapshot().notice).toBe('Select a model in the composer, or choose an auxiliary model in settings.')
+  })
+
   it('keeps an in-flight manual optimization alive across one failed status poll', async () => {
     const f = fixture(); await f.controller.refresh()
     const task = f.controller.optimize()
@@ -178,20 +143,6 @@ describe('browser editor transactions', () => {
     f.resolve(0, '请说明这样修改的原因。'); await task
     expect(f.controller.getSnapshot().busy).toBeNull()
     expect(f.controller.getSnapshot().change?.afterTarget).toBe('请说明这样修改的原因。')
-  })
-  it('enforces independent optimization and stash switches without hiding saved drafts', async () => {
-    const f = fixture(); await f.controller.refresh()
-    await f.controller.stash(); await flush()
-    const saved = f.controller.getSnapshot().drafts[0]
-    f.update('继续输入')
-    await f.controller.updateSettings({ optimizeEnabled: false, stashEnabled: false })
-    await f.controller.optimize(); await f.controller.stash()
-    expect(f.pending).toHaveLength(0)
-    expect(f.calls.filter(call => call.method === 'drafts/save')).toHaveLength(1)
-    expect(f.controller.restoreDraft(saved, 'replace')).toBe(false)
-    expect(f.binding.input.draft).toBe('继续输入')
-    await f.controller.deleteDraft(saved.id)
-    expect(f.controller.getSnapshot().drafts).toHaveLength(0)
   })
   it('keeps UTF-16 insertion offsets while counting emoji budgets as Unicode characters', async () => {
     vi.useFakeTimers(); const text = '😀'.repeat(100), f = fixture(text, true)
@@ -295,37 +246,6 @@ describe('browser editor transactions', () => {
     await f.controller.optimize()
     expect(f.pending).toHaveLength(0)
     expect(f.controller.getSnapshot().notice).toContain('受保护片段')
-  })
-})
-
-describe('draft persistence transactions', () => {
-  it('keeps the original draft on persistence failure', async () => {
-    const f = fixture(); await f.controller.refresh(); f.failSave(); await f.controller.stash()
-    expect(f.insertText).not.toHaveBeenCalled()
-    expect(f.controller.getSnapshot().notice).toContain('保存失败')
-  })
-  it('saves before clearing and restores explicitly as append or replace', async () => {
-    const f = fixture(); await f.controller.refresh(); await f.controller.stash(); await flush()
-    expect(f.binding.input.draft).toBe('')
-    const draft = f.controller.getSnapshot().drafts[0]
-    expect(draft.text).toBe('请改善这段说明')
-    f.update('临时问题')
-    f.controller.restoreDraft(draft, 'append'); await flush()
-    expect(f.binding.input.draft).toBe('临时问题\n请改善这段说明')
-    f.controller.restoreDraft(draft, 'replace'); await flush()
-    expect(f.binding.input.draft).toBe('请改善这段说明')
-  })
-  it('saves a snapshot without clearing edits made during the save', async () => {
-    const f = fixture(); await f.controller.refresh(); const saved = f.delaySave()
-    const task = f.controller.stash(); f.update('保存过程中修改的新稿'); saved.resolve({ id: 'draft-1', text: '', createdAt: 0 }); await task
-    expect(f.insertText).not.toHaveBeenCalled()
-    expect(f.binding.input.draft).toBe('保存过程中修改的新稿')
-    expect(f.controller.getSnapshot().drafts[0].text).toBe('请改善这段说明')
-  })
-  it('refuses to stash or replace a draft containing attachments', async () => {
-    const f = fixture(); await f.controller.refresh(); f.setAttachments(); await f.controller.stash()
-    expect(f.calls.some(call => call.method === 'drafts/save')).toBe(false)
-    expect(f.controller.restoreDraft({ id: 'x', text: 'saved', createdAt: 0 }, 'replace')).toBe(false)
   })
 })
 

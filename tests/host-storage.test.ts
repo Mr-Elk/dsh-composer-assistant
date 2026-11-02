@@ -17,38 +17,11 @@ function fixture() {
   return { create: () => new AssistantStorage(async () => domain), fail: () => { fail = true } }
 }
 
-describe('session-isolated durable drafts', () => {
-  it('serializes concurrent initial saves and enforces the three-draft cap', async () => {
-    const storage = fixture().create()
-    const results = await Promise.allSettled(['a', 'b', 'c', 'd'].map(text => storage.save('session-a', text)))
-    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(3)
-    expect((await storage.list('session-a')).map(draft => draft.text)).toEqual(['a', 'b', 'c'])
-    expect(await storage.list('session-b')).toEqual([])
-  })
-
-  it('retains explicitly saved text after a rejected replacement and across repository reopen', async () => {
-    const f = fixture(), storage = f.create()
-    const saved = await storage.save('a', '长草稿原文')
-    f.fail()
-    await expect(storage.save('a', '未能保存的新稿', saved[0]!.id)).rejects.toThrow('disk full')
-    expect((await f.create().list('a'))[0]?.text).toBe('长草稿原文')
-  })
-
-  it('replaces only the explicitly selected draft and returns defensive snapshots', async () => {
-    const storage = fixture().create()
-    const before = await storage.save('a', 'first')
-    await storage.save('a', 'second')
-    await storage.save('a', 'replacement', before[0]!.id)
-    const read = await storage.list('a')
-    read[0]!.text = 'mutated outside'
-    expect((await storage.list('a')).map(draft => draft.text)).toEqual(['replacement', 'second'])
-    await expect(storage.save('a', 'bad', 'missing')).rejects.toMatchObject({ code: 'DRAFT_NOT_FOUND' })
-  })
-
+describe('stored settings transactions', () => {
   it('validates settings before committing and retains selected display mode on reopen', async () => {
     const f = fixture(), storage = f.create()
     await storage.updateSettings({ displayMode: 'panel', nextEnabled: false })
-    await expect(storage.updateSettings({ debounceMs: 0 })).rejects.toMatchObject({ code: 'CONFIG' })
+    await expect(storage.updateSettings({ debounceMs: 0 })).rejects.toMatchObject({ code: 'CONFIG_NUMBER', params: { field: 'debounceMs', min: 200, max: 5000 } })
     expect(await f.create().settings()).toMatchObject({ displayMode: 'panel', nextEnabled: false, debounceMs: 600 })
   })
 })
@@ -78,6 +51,14 @@ describe('stored settings survive version drift', () => {
     expect('futureFlag' in (f.read().settings as object)).toBe(false)
   })
 
+  it('ignores a removed nextTrigger and defaults a missing language to follow', async () => {
+    const { language: _language, ...legacy } = DEFAULT_CONFIG
+    const f = seeded({ ...legacy, nextTrigger: 'manual' })
+    const settings = await f.storage.settings()
+    expect(settings.language).toBe('follow')
+    expect('nextTrigger' in settings).toBe(false)
+  })
+
   it('falls back per field for corrupted values while keeping the rest', async () => {
     const f = seeded({ ...DEFAULT_CONFIG, debounceMs: 'oops', optimizeEnabled: 'yes', suggestionLength: 'huge', displayMode: 'panel' })
     const settings = await f.storage.settings()
@@ -104,6 +85,6 @@ describe('stored settings survive version drift', () => {
 
   it('still rejects unknown keys in an explicit patch', async () => {
     const f = seeded({ ...DEFAULT_CONFIG })
-    await expect(f.storage.updateSettings({ legacyFlag: true } as never)).rejects.toMatchObject({ code: 'CONFIG' })
+    await expect(f.storage.updateSettings({ legacyFlag: true } as never)).rejects.toMatchObject({ code: 'CONFIG_UNKNOWN' })
   })
 })

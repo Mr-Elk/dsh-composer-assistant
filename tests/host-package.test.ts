@@ -14,7 +14,7 @@ import { gunzipSync } from 'node:zlib'
 import { randomUUID } from 'node:crypto'
 import { dirname, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { AssistantStatus, StoredDraft } from '../src/core/types'
+import type { AssistantStatus } from '../src/core/types'
 
 /** Only the external medium is replaced; Loader, Gateway and plugin are published code. */
 class PersistentFixtureMedium extends Service {
@@ -75,7 +75,7 @@ async function extractPublishedPackage(): Promise<string> {
 }
 
 describe.skipIf(!existsSync(archive))('published .tgz through the official Loader', () => {
-  it('loads actual packed entry, configures, disables, reenables and unloads with drafts preserved', async () => {
+  it('loads actual packed entry, configures, disables, reenables and unloads with settings preserved', async () => {
     const packedRoot = await extractPublishedPackage()
     const pkg = JSON.parse(await readFile(resolve(packedRoot, 'package.json'), 'utf8'))
     expect(pkg.engines.dsh).toBe('>=0.2.1-rc.2 <0.3.0-0')
@@ -103,7 +103,6 @@ describe.skipIf(!existsSync(archive))('published .tgz through the official Loade
     }) as T
     const before = await call<AssistantStatus>('status', { sessionId: session.id })
     expect(before.settings.displayMode).toBe('panel')
-    const drafts = await call<StoredDraft[]>('drafts/save', { sessionId: session.id, text: '安装包中的草稿 😀\n第二行' })
     await call('settings/set', { nextEnabled: false })
     await loader.update(id, { disabled: true })
     await loader.await()
@@ -112,7 +111,6 @@ describe.skipIf(!existsSync(archive))('published .tgz through the official Loade
     await loader.update(id, { disabled: false })
     await loader.await()
     await loader.resolve(id).fiber?.await()
-    expect(await call('drafts/list', { sessionId: session.id })).toEqual(drafts)
     const after = await call<AssistantStatus>('status', { sessionId: session.id })
     expect(after.settings.nextEnabled).toBe(false)
     expect(after.generation).not.toBe(before.generation)

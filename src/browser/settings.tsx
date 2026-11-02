@@ -1,17 +1,81 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { resolveConfig } from '../core/config'
-import { DEFAULT_CONFIG, type AssistantConfig } from '../core/types'
+import { DEFAULT_CONFIG, type AssistantConfig, type ModelCatalog, type ModelOption } from '../core/types'
+import { PLUGIN_VERSION } from '../core/version'
+import { LANGUAGE_SELECTION_ENABLED, effectiveLanguage, resolveUiLocale, t, type MessageKey } from '../core/i18n'
+import { isSettingsDraftDirty, settingsPatch } from './settings-draft'
+import { InfoTip } from './info-tip'
+import { errorCopy } from './error-copy'
 import type { BrowserRuntime } from './runtime'
+import type { UsageMetrics } from './controller'
 
 type SettingsProps = PropsRuntime<'settings.section'> & { runtime: BrowserRuntime }
+const SETTINGS_DRAFT_KEY = 'dsh.input-assistant.settings-draft.v1'
+type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string
+type ToastState = { text: string; tone: 'success' | 'info'; ttl: number; id: number }
 
-function Row({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  return <div className="dsh-ia-item">
-    <span className="dsh-ia-item-main"><b>{title}</b>{hint && <small>{hint}</small>}</span>
+function Chevron({ up = false }: { up?: boolean }) {
+  return <svg className="dsh-ia-chevron" aria-hidden="true" viewBox="0 0 16 16" width="12" height="12" fill="none">
+    <path d={up ? 'M4 10 8 6l4 4' : 'M4 6l4 4 4-4'} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+}
+
+function ChevronRight() {
+  return <svg className="dsh-ia-chevron" aria-hidden="true" viewBox="0 0 16 16" width="12" height="12" fill="none">
+    <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+}
+
+function Row({ title, hint, hintLabel, helpLabel, disabled, children }: {
+  title: string; hint?: string; hintLabel?: string; helpLabel?: string; disabled?: boolean; children: ReactNode
+}) {
+  return <div className={`dsh-ia-item${disabled ? ' dsh-ia-item-disabled' : ''}`} aria-disabled={disabled || undefined}>
+    <span className="dsh-ia-item-main"><span className="dsh-ia-item-title"><b>{title}</b>{hint && <InfoTip text={hint} label={`${helpLabel ?? 'Help'}: ${hintLabel ?? title}`} />}</span></span>
     <span className="dsh-ia-control">{children}</span>
   </div>
+}
+
+function AboutDialog({ open, onClose, translate }: {
+  open: boolean; onClose: () => void; translate: Translate
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const close = useRef(onClose)
+  const [copied, setCopied] = useState<'idle' | 'ok' | 'failed'>('idle')
+  close.current = onClose
+  useEffect(() => {
+    if (!open) return
+    closeRef.current?.focus()
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); close.current() } }
+    document.addEventListener('keydown', key, true)
+    return () => document.removeEventListener('keydown', key, true)
+  }, [open])
+  useEffect(() => { if (!open) setCopied('idle') }, [open])
+  if (!open) return null
+  const command = 'dsh plugin --profile desktop add dsh-composer-assistant'
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(command); setCopied('ok') }
+    catch { setCopied('failed') }
+  }
+  return createPortal(<div className="dsh-ia dsh-ia-about-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
+    <div className="dsh-ia-about" role="dialog" aria-modal="true" aria-label={translate('about.title')}>
+      <div className="dsh-ia-about-head"><b>{translate('about.title')}</b>
+        <button ref={closeRef} type="button" className="dsh-ia-about-close" aria-label={translate('about.close')} onClick={onClose}>×</button>
+      </div>
+      <div className="dsh-ia-about-row"><span>{translate('about.version')}</span><span>{PLUGIN_VERSION}</span></div>
+      <div className="dsh-ia-about-upgrade">
+        <span className="dsh-ia-about-label">{translate('about.upgrade')}</span>
+        <p className="dsh-ia-about-hint">{translate('about.upgradeHint')}</p>
+        <div className="dsh-ia-about-command">
+          <code>{command}</code>
+          <button type="button" onClick={() => { void copy() }}>{copied === 'ok' ? translate('about.copied') : translate('about.copy')}</button>
+        </div>
+        <p className="dsh-ia-about-note" role="status">{copied === 'failed' ? translate('about.copyFailed') : translate('about.restartNote')}</p>
+      </div>
+    </div>
+  </div>, document.body)
 }
 
 /** A root-scoped DSH settings section; works even when no composer is mounted. */
@@ -22,125 +86,293 @@ export function AssistantSettings({ runtime }: SettingsProps) {
   const [form, setForm] = useState<AssistantConfig>({ ...DEFAULT_CONFIG })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
+  const [toast, setToast] = useState<ToastState | null>(null)
   const [error, setError] = useState('')
+  const [conflict, setConflict] = useState(false)
+  const toastSequence = useRef(0)
+  const showToast = (text: string, tone: ToastState['tone'] = 'success', ttl = 2000) => {
+    setToast({ text, tone, ttl, id: ++toastSequence.current })
+  }
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), toast.ttl)
+    return () => clearTimeout(timer)
+  }, [toast])
+  const [catalog, setCatalog] = useState<ModelCatalog | null>(null)
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogError, setCatalogError] = useState('')
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
+  const aboutButtonRef = useRef<HTMLButtonElement>(null)
+  const acceptedRef = useRef<AssistantConfig | null>(null)
+  const formRef = useRef<AssistantConfig>(form)
+  const dirtyRef = useRef(false)
+
+  const locale = resolveUiLocale(effectiveLanguage(accepted?.language ?? 'follow'), runtime.locale?.() ?? 'zh')
+  const tr: Translate = (key, vars) => t(locale, key, vars)
+
   useEffect(() => {
     const abort = new AbortController()
-    setLoading(true); setError(''); setMessage('')
-    if (generation === null) { setLoading(false); setError('连接已断开，请重连后加载设置'); return () => abort.abort() }
+    setLoading(true); setError(''); setToast(null)
+    if (generation === null) { setLoading(false); setError(tr('settings.disconnected')); return () => abort.abort() }
     void runtime.transport.call<AssistantConfig>('settings/get', {}, abort.signal).then(settings => {
       if (abort.signal.aborted) return
       const normalized = resolveConfig(settings)
-      setAccepted(normalized); setForm(normalized); setLoading(false)
-    }).catch(reason => { if (!abort.signal.aborted) { setLoading(false); setError(reason instanceof Error ? reason.message : '设置加载失败') } })
+      let restored: AssistantConfig | null = null
+      try {
+        const raw = sessionStorage.getItem(SETTINGS_DRAFT_KEY)
+        if (raw) restored = resolveConfig(JSON.parse(raw) as Partial<AssistantConfig>)
+      } catch { /* ignore invalid draft */ }
+      setAccepted(normalized)
+      if (restored && isSettingsDraftDirty({ accepted: normalized, draft: restored })) {
+        setForm(restored); showToast(tr('settings.restoredDraft'), 'info', 4000)
+      } else {
+        setForm(normalized)
+        try { sessionStorage.removeItem(SETTINGS_DRAFT_KEY) } catch { /* storage unavailable */ }
+      }
+      setLoading(false)
+    }).catch(reason => {
+      if (!abort.signal.aborted) { setLoading(false); setError(errorCopy(reason, tr) ?? tr('settings.loadFailed')) }
+    })
     return () => abort.abort()
   }, [runtime, generation])
+
+  useEffect(() => {
+    let live = true
+    setCatalogLoading(true); setCatalogError('')
+    if (generation === null) { setCatalogLoading(false); return }
+    void runtime.listModels().then(next => {
+      if (!live) return
+      setCatalog(next); setCatalogLoading(false)
+      if (next.failures.length) setCatalogError(tr('settings.modelCatalogFailed'))
+    }).catch(reason => {
+      if (!live) return
+      setCatalogLoading(false); setCatalogError(errorCopy(reason, tr) ?? tr('settings.modelCatalogFailed'))
+    })
+    return () => { live = false }
+  }, [runtime, generation, locale])
+
+  useEffect(() => {
+    if (!catalog || !accepted || !accepted.provider || !accepted.model) return
+    if (catalog.models.some(model => model.provider === accepted.provider && model.model === accepted.model)) return
+    setForm(previous => ({ ...previous, provider: '', model: '' }))
+    showToast(tr('settings.modelRemoved'), 'info', 3000)
+  }, [catalog, accepted, locale])
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'hidden' || generation === null || loading || saving) return
+      void runtime.transport.call<AssistantConfig>('settings/get', {}).then(next => {
+        if (!accepted) return
+        const normalized = resolveConfig(next)
+        // A dirty form is not a conflict by itself: a restored draft is dirty
+        // against the same accepted settings. Only an actually changed Host
+        // document is a conflict.
+        if (JSON.stringify(normalized) === JSON.stringify(accepted)) return
+        if (isSettingsDraftDirty({ accepted, draft: form })) { setConflict(true); setError(tr('settings.conflict')); return }
+        setConflict(false); setError(''); setAccepted(normalized); setForm(normalized)
+      }).catch(() => {})
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
+  }, [runtime, generation, accepted, form, loading, saving, locale])
+
   const change = <K extends keyof AssistantConfig>(key: K, value: AssistantConfig[K]) => {
-    setForm(previous => ({ ...previous, [key]: value })); setMessage(''); setError('')
+    setForm(previous => ({ ...previous, [key]: value })); setToast(null); if (!conflict) setError('')
   }
-  const save = async (event: React.FormEvent) => {
+
+  const save = async (event: FormEvent) => {
     event.preventDefault()
     if (!accepted || saving || generation === null) return
-    setError(''); setMessage('')
-    let draft: AssistantConfig
-    try { draft = resolveConfig(form) }
-    catch (reason) { setError(reason instanceof Error ? reason.message : '设置无效'); return }
+    setError(''); setToast(null)
+    let patch: Partial<AssistantConfig>
+    try { patch = settingsPatch({ accepted, draft: form }) }
+    catch (reason) { setError(errorCopy(reason, tr) ?? tr('settings.invalidGeneric')); return }
+    if (Object.keys(patch).length === 0) { setForm(accepted); return }
     setSaving(true)
     try {
-      const patch = Object.fromEntries(Object.entries(draft).filter(([key, value]) => value !== accepted[key as keyof AssistantConfig])) as Partial<AssistantConfig>
       const settings = await runtime.saveSettings(patch)
       if (runtime.transport.generation() !== generation) return
-      setAccepted(settings); setForm(settings); setMessage('设置已保存并生效')
-    } catch (reason) { setError(`保存未确认：${reason instanceof Error ? reason.message : '请重试'}；请重新打开设置核对`) }
-    finally { setSaving(false) }
+      const nextLocale = resolveUiLocale(effectiveLanguage(settings.language), runtime.locale?.() ?? 'zh')
+      setAccepted(settings); setForm(settings); setConflict(false); showToast(t(nextLocale, 'settings.saved'), 'success', 2000)
+      try { sessionStorage.removeItem(SETTINGS_DRAFT_KEY) } catch { /* storage unavailable */ }
+    } catch (reason) {
+      setError(errorCopy(reason, tr) ?? tr('settings.saveFailedGeneric'))
+    } finally { setSaving(false) }
   }
-  const changed = accepted !== null && JSON.stringify(form) !== JSON.stringify(accepted)
-  const toggle = (key: 'optimizeEnabled' | 'nextEnabled' | 'completionEnabled' | 'stashEnabled', label: string, hint: string) =>
-    <label className="dsh-ia-item">
-      <span className="dsh-ia-item-main"><b>{label}</b><small>{hint}</small></span>
-      <span className="dsh-ia-control"><input className="dsh-ia-switch" type="checkbox" aria-label={label} checked={form[key]} onChange={event => change(key, event.target.checked)} /></span>
-    </label>
-  return <form className="dsh-ia dsh-ia-settings" aria-label="输入助手设置" onSubmit={event => { void save(event) }}>
-    <p className="dsh-ia-settings-intro">帮助你形成准确、可发送的输入。开关决定要不要这个功能，其余保持默认即可。</p>
-    {loading && <p role="status">正在加载设置…</p>}
-    {message && <p role="status">{message}</p>}
-    {error && <p role="alert">{error}</p>}
-    <fieldset className="dsh-ia-settings-fieldset" disabled={loading || saving || generation === null || !accepted}>
-      <section className="dsh-ia-group">
-        <h3>功能</h3>
-        <div className="dsh-ia-rows">
-          {toggle('optimizeEnabled', '提示词优化', '把草稿或选中文字改写成可发送的表达')}
-          {toggle('nextEnabled', '回复后预测', '助手回复结束后，为空输入框预测下一句')}
-          {toggle('completionEnabled', '输入续写', '按当前草稿与光标位置继续写')}
-          {toggle('stashEnabled', '草稿暂存', '每个会话保留最多三份草稿')}
+
+  const changed = accepted !== null && isSettingsDraftDirty({ accepted, draft: form })
+  acceptedRef.current = accepted
+  formRef.current = form
+  dirtyRef.current = changed
+  useEffect(() => () => {
+    if (!acceptedRef.current || !dirtyRef.current) return
+    try { sessionStorage.setItem(SETTINGS_DRAFT_KEY, JSON.stringify(formRef.current)) } catch { /* storage unavailable */ }
+  }, [])
+  const suggestionDisabled = !form.nextEnabled && !form.completionEnabled
+  const currentRoute = runtime.currentRoute()
+  const modelHint = [currentRoute ? tr('model.current', { model: currentRoute.model }) : '', tr('model.source'), tr('model.billing')].filter(Boolean).join('；')
+  const baseModels = catalog?.models ?? []
+  const currentPair: ModelOption | null = form.provider && form.model
+    ? { provider: form.provider, providerName: form.provider, model: form.model, name: `${form.provider} / ${form.model}` }
+    : null
+  const models = currentPair && !baseModels.some(model => model.provider === currentPair.provider && model.model === currentPair.model)
+    ? [currentPair, ...baseModels] : baseModels
+  const modelValue = form.provider && form.model ? JSON.stringify([form.provider, form.model]) : ''
+
+  const closeAbout = () => {
+    setAboutOpen(false)
+    requestAnimationFrame(() => aboutButtonRef.current?.focus())
+  }
+
+  const reloadSettings = async () => {
+    if (generation === null) return
+    setLoading(true); setError(''); setToast(null)
+    try {
+      const settings = await runtime.transport.call<AssistantConfig>('settings/get', {})
+      const normalized = resolveConfig(settings)
+      setAccepted(normalized); setForm(normalized); setConflict(false)
+      try { sessionStorage.removeItem(SETTINGS_DRAFT_KEY) } catch { /* storage unavailable */ }
+    } catch (reason) {
+      setError(errorCopy(reason, tr) ?? tr('settings.loadFailed'))
+    } finally { setLoading(false) }
+  }
+
+  const resetDefaults = () => {
+    setForm({ ...DEFAULT_CONFIG }); setError(''); showToast(tr('settings.resetDone'), 'info', 2500)
+  }
+
+  return <div className="dsh-ia dsh-ia-settings-shell">
+    <form className="dsh-ia-settings" aria-label={tr('settings.title')} onSubmit={event => { void save(event) }}>
+      <header className="dsh-ia-settings-head">
+        <div className="dsh-ia-settings-head-copy">
+          <h2>{tr('settings.heading')}</h2>
+          <p>{tr('settings.subtitle')}</p>
         </div>
-      </section>
-      <section className="dsh-ia-group">
-        <h3>建议</h3>
-        <div className="dsh-ia-rows">
-          <Row title="建议长度" hint="短更克制，长更完整；超出输入框可见高度时会自动改用候选卡">
-            <select aria-label="建议长度" value={form.suggestionLength} onChange={event => change('suggestionLength', event.target.value as AssistantConfig['suggestionLength'])}>
-              <option value="short">短</option><option value="standard">标准</option><option value="long">长</option>
-            </select>
-          </Row>
-          <Row title="触发方式" hint="自动：每轮结束请求一次；手动：只用菜单里的「换一条建议」">
-            <select aria-label="触发方式" value={form.nextTrigger} onChange={event => change('nextTrigger', event.target.value as AssistantConfig['nextTrigger'])}>
-              <option value="auto">自动</option><option value="manual">手动</option>
-            </select>
-          </Row>
+        {toast && <div className={`dsh-ia-settings-toast is-${toast.tone}`} role="status" aria-live="polite"><span className="dsh-ia-toast-icon" aria-hidden="true">{toast.tone === 'success' ? '✓' : 'i'}</span>{toast.text}</div>}
+      </header>
+      {loading && <p role="status">{tr('settings.loading')}</p>}
+      <fieldset className="dsh-ia-settings-fieldset" disabled={loading || saving || generation === null || !accepted}>
+        {LANGUAGE_SELECTION_ENABLED && <section className="dsh-ia-group">
+          <h3>{tr('settings.general')}</h3>
+          <div className="dsh-ia-rows">
+            <Row title={tr('settings.language')} hintLabel={tr('settings.language')}>
+              <select aria-label={tr('settings.language')} value={form.language} onChange={event => change('language', event.target.value as AssistantConfig['language'])}>
+                <option value="follow">{tr('language.follow')}</option>
+                <option value="zh">{tr('language.zh')}</option>
+                <option value="en">{tr('language.en')}</option>
+              </select>
+            </Row>
+          </div>
+        </section>}
+
+        <section className="dsh-ia-group">
+          <h3>{tr('settings.features')}</h3>
+          <div className="dsh-ia-rows">
+            <Row title={tr('settings.optimize')}>
+              <span className="dsh-ia-switch"><input type="checkbox" aria-label={tr('settings.optimize')} checked={form.optimizeEnabled} onChange={event => change('optimizeEnabled', event.target.checked)} /><svg className="dsh-ia-switch-svg" viewBox="0 0 44 24" aria-hidden="true"><rect className="dsh-ia-switch-track" x="0" y="0" width="44" height="24" rx="12" ry="12" /><circle className="dsh-ia-switch-knob" cx="12" cy="12" r="10" /></svg></span>
+            </Row>
+            <Row title={tr('settings.next')}>
+              <span className="dsh-ia-switch"><input type="checkbox" aria-label={tr('settings.next')} checked={form.nextEnabled} onChange={event => change('nextEnabled', event.target.checked)} /><svg className="dsh-ia-switch-svg" viewBox="0 0 44 24" aria-hidden="true"><rect className="dsh-ia-switch-track" x="0" y="0" width="44" height="24" rx="12" ry="12" /><circle className="dsh-ia-switch-knob" cx="12" cy="12" r="10" /></svg></span>
+            </Row>
+            <Row title={tr('settings.completion')}>
+              <span className="dsh-ia-switch"><input type="checkbox" aria-label={tr('settings.completion')} checked={form.completionEnabled} onChange={event => change('completionEnabled', event.target.checked)} /><svg className="dsh-ia-switch-svg" viewBox="0 0 44 24" aria-hidden="true"><rect className="dsh-ia-switch-track" x="0" y="0" width="44" height="24" rx="12" ry="12" /><circle className="dsh-ia-switch-knob" cx="12" cy="12" r="10" /></svg></span>
+            </Row>
+          </div>
+        </section>
+
+        <section className="dsh-ia-group">
+          <h3>{tr('settings.suggestions')}</h3>
+          <div className="dsh-ia-rows">
+            <Row helpLabel={tr('common.help')} title={tr('settings.suggestionLength')} hint={tr('settings.hint.suggestionLength')} hintLabel={tr('settings.suggestionLength')} disabled={suggestionDisabled}>
+              <select aria-label={tr('settings.suggestionLength')} value={form.suggestionLength} disabled={suggestionDisabled} onChange={event => change('suggestionLength', event.target.value as AssistantConfig['suggestionLength'])}>
+                <option value="short">{tr('settings.select.short')}</option>
+                <option value="standard">{tr('settings.select.standard')}</option>
+                <option value="long">{tr('settings.select.long')}</option>
+              </select>
+            </Row>
+          </div>
+        </section>
+
+        <section className="dsh-ia-group">
+          <h3>{tr('settings.optimization')}</h3>
+          <div className="dsh-ia-rows">
+            <Row helpLabel={tr('common.help')} title={tr('settings.strength')} hint={tr('settings.hint.strength')} hintLabel={tr('settings.strength')} disabled={!form.optimizeEnabled}>
+              <select aria-label={tr('settings.strength')} value={form.optimizationStrength} disabled={!form.optimizeEnabled} onChange={event => change('optimizationStrength', event.target.value as AssistantConfig['optimizationStrength'])}>
+                <option value="light">{tr('settings.select.light')}</option>
+                <option value="standard">{tr('settings.select.standardOptimization')}</option>
+                <option value="deep">{tr('settings.select.deep')}</option>
+              </select>
+            </Row>
+          </div>
+        </section>
+
+        <section className="dsh-ia-group">
+          <h3>{tr('settings.model')}</h3>
+          <div className="dsh-ia-rows">
+            <Row helpLabel={tr('common.help')} title={tr('settings.modelLabel')} hint={modelHint} hintLabel={tr('settings.modelLabel')} disabled={catalogLoading}>
+              <select aria-label={tr('settings.modelLabel')} value={modelValue} disabled={catalogLoading}
+                onChange={event => {
+                  const raw = event.target.value
+                  if (!raw) { change('provider', ''); change('model', ''); return }
+                  const selected = models.find(model => JSON.stringify([model.provider, model.model]) === raw)
+                  if (selected) { change('provider', selected.provider); change('model', selected.model) }
+                }}>
+                <option value="">{tr('model.follow')}</option>
+                {models.map(model => <option key={`${model.provider}:${model.model}`} value={JSON.stringify([model.provider, model.model])}>
+                  {model.providerName && model.providerName !== model.name ? `${model.providerName} / ${model.name}` : model.name}
+                </option>)}
+              </select>
+            </Row>
+            {catalogLoading && <p className="dsh-ia-group-note" role="status">{tr('model.loading')}</p>}
+            {catalogError && <p className="dsh-ia-group-note" role="status">{catalogError}</p>}
+            {!catalogLoading && !catalogError && catalog && catalog.models.length === 0 && <p className="dsh-ia-group-note">{tr('model.unavailable')}</p>}
+          </div>
+        </section>
+
+        <section className="dsh-ia-group">
+          <button type="button" className="dsh-ia-disclosure" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(value => !value)}>
+            <span>{tr('settings.advanced')}</span>
+            <span className="dsh-ia-disclosure-summary">{tr('settings.advancedCount', { count: 5 })}<Chevron up={advancedOpen} /></span>
+          </button>
+          {advancedOpen && <div className="dsh-ia-rows">
+            <Row helpLabel={tr('common.help')} title={tr('settings.context')} hint={tr('settings.hint.context')} hintLabel={tr('settings.context')}>
+              <input type="number" aria-label={tr('settings.context')} value={form.maxHistoryChars} min={1000} max={64000} step={1000}
+                onChange={event => change('maxHistoryChars', Number(event.target.value))} />
+            </Row>
+            <Row helpLabel={tr('common.help')} title={tr('settings.timeout')} hint={tr('settings.hint.timeout')} hintLabel={tr('settings.timeout')}>
+              <input type="number" aria-label={tr('settings.timeout')} value={Math.round(form.suggestionTimeoutMs / 1000)} min={5} max={60} step={1}
+                onChange={event => change('suggestionTimeoutMs', Number(event.target.value) * 1000)} />
+            </Row>
+            <Row helpLabel={tr('common.help')} title={tr('settings.hourly')} hint={tr('settings.hint.hourly')} hintLabel={tr('settings.hourly')}>
+              <input type="number" aria-label={tr('settings.hourly')} value={form.hourlyCallLimit} min={0} max={2000} step={10}
+                onChange={event => change('hourlyCallLimit', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
+            </Row>
+            <Row helpLabel={tr('common.help')} title={tr('settings.temperature')} hint={tr('settings.hint.temperature')} hintLabel={tr('settings.temperature')}>
+              <input type="number" aria-label={tr('settings.temperature')} value={Number.isNaN(form.temperature) ? '' : form.temperature} min={0} max={2} step={0.1}
+                onChange={event => change('temperature', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
+            </Row>
+            <label className="dsh-ia-field dsh-ia-field-block">
+              <span className="dsh-ia-field-title">{tr('settings.extra')} <InfoTip text={tr('settings.hint.extra')} label={`${tr('common.help')}: ${tr('settings.extra')}`} /></span>
+              <textarea aria-label={tr('settings.extra')} value={form.extraInstruction} maxLength={500} rows={3}
+                placeholder={tr('settings.extraPlaceholder')}
+                onChange={event => change('extraInstruction', event.target.value)} />
+            </label>
+          </div>}
+        </section>
+
+        {error && <div className="dsh-ia-settings-error" role="alert"><span>{error}</span>{conflict && <button type="button" className="dsh-ia-link" onClick={() => { void reloadSettings() }}>{tr('settings.reload')}</button>}</div>}
+        <div className="dsh-ia-settings-actions">
+          {changed && <span className="dsh-ia-muted">{tr('settings.unsaved')}</span>}
+          <button type="button" disabled={!accepted || saving} onClick={resetDefaults}>{tr('settings.reset')}</button>
+          <button type="submit" className="dsh-ia-primary" disabled={!changed || saving || conflict}>{saving ? tr('settings.saving') : tr('settings.save')}</button>
         </div>
-      </section>
-      <section className="dsh-ia-group">
-        <h3>优化</h3>
-        <div className="dsh-ia-rows">
-          <Row title="优化强度" hint="轻度只修表达，深度可重组结构；各档都不新增任务或授权">
-            <select aria-label="优化强度" value={form.optimizationStrength} onChange={event => change('optimizationStrength', event.target.value as AssistantConfig['optimizationStrength'])}>
-              <option value="light">轻度润色</option><option value="standard">标准优化</option><option value="deep">深度梳理</option>
-            </select>
-          </Row>
-        </div>
-      </section>
-      <section className="dsh-ia-group">
-        <h3>辅助模型</h3>
-        <p className="dsh-ia-group-note">两项同时留空时跟随输入框模型；辅助调用单独消耗模型用量。</p>
-        <div className="dsh-ia-rows">
-          <Row title="提供商"><input type="text" aria-label="提供商" value={form.provider} onChange={event => change('provider', event.target.value)} placeholder="跟随输入框" maxLength={200} autoComplete="off" /></Row>
-          <Row title="模型"><input type="text" aria-label="模型" value={form.model} onChange={event => change('model', event.target.value)} placeholder="跟随输入框" maxLength={200} autoComplete="off" /></Row>
-        </div>
-      </section>
-      <section className="dsh-ia-group">
-        <h3>高级</h3>
-        <div className="dsh-ia-rows">
-          <Row title="上下文上限" hint="参与建议的对话上下文字数；越长越完整，也越贵">
-            <input type="number" aria-label="上下文上限" value={form.maxHistoryChars} min={1000} max={64000} step={1000}
-              onChange={event => change('maxHistoryChars', Number(event.target.value))} />
-          </Row>
-          <Row title="建议超时" hint="5–60 秒；模型较慢时可放宽，超时不会改动草稿">
-            <input type="number" aria-label="建议超时（秒）" value={Math.round(form.suggestionTimeoutMs / 1000)} min={5} max={60} step={1}
-              onChange={event => change('suggestionTimeoutMs', Number(event.target.value) * 1000)} />
-          </Row>
-          <Row title="每小时调用上限" hint="全局上限，只计自动建议；0 表示不限制，手动优化与「换一条」不计入">
-            <input type="number" aria-label="每小时调用上限" value={form.hourlyCallLimit} min={0} max={2000} step={10}
-              onChange={event => change('hourlyCallLimit', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
-          </Row>
-          <Row title="温度" hint="0.3 稳定 / 0.7 平衡 / 1.0 发散；越低越保守">
-            <input type="number" aria-label="温度" value={Number.isNaN(form.temperature) ? '' : form.temperature} min={0} max={2} step={0.1}
-              onChange={event => change('temperature', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
-          </Row>
-        </div>
-        <label className="dsh-ia-field dsh-ia-field-block">
-          <span className="dsh-ia-field-title">额外指令</span>
-          <span className="dsh-ia-field-hint">追加到系统提示词，最多 500 字；例如“用更口语的中文”“不要出现列表”</span>
-          <textarea aria-label="额外指令" value={form.extraInstruction} maxLength={500} rows={3}
-            placeholder="例如：用更口语的中文；不要出现列表；优先给出下一步验证"
-            onChange={event => change('extraInstruction', event.target.value)} />
-        </label>
-      </section>
-      <div className="dsh-ia-settings-actions">
-        <button type="submit" className="dsh-ia-primary" disabled={!changed}>{saving ? '保存中…' : '保存设置'}</button>
-        <button type="button" disabled={!changed} onClick={() => { if (accepted) setForm(accepted); setError(''); setMessage('已放弃未保存的修改') }}>放弃修改</button>
-        {changed && <span className="dsh-ia-muted">有未保存的修改</span>}
-      </div>
-    </fieldset>
-  </form>
+      </fieldset>
+    </form>
+    <div className="dsh-ia-settings-footer">
+      <button ref={aboutButtonRef} type="button" className="dsh-ia-link" onClick={() => setAboutOpen(true)}>{tr('settings.aboutLink')}<ChevronRight /></button>
+    </div>
+    <AboutDialog open={aboutOpen} onClose={closeAbout} translate={tr} />
+  </div>
 }

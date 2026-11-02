@@ -49,7 +49,6 @@ const actions = {
   persistDraft() {},
 }
 let settings: AssistantConfig = { ...DEFAULT_CONFIG, nextEnabled: false, completionEnabled: false }
-let drafts: { id: string; text: string; createdAt: number }[] = []
 let requests = 0
 const connection = {
   generation: { getSnapshot: () => ({ id: 1 }), subscribe: () => () => {} },
@@ -59,14 +58,6 @@ const connection = {
     switch (method) {
       case 'status': value = { sourceTurnId: '1', running: false, settings, generation: 'fixture-host', route: { provider: 'fixture', model: 'local' } }; break
       case 'settings/set': settings = { ...settings, ...data }; value = settings; break
-      case 'drafts/list': value = drafts; break
-      case 'drafts/save': {
-        const item = { id: data.replaceId || String(Date.now()), text: data.text, createdAt: Date.now() }
-        drafts = data.replaceId ? drafts.map(d => d.id === data.replaceId ? item : d) : [...drafts, item]
-        value = drafts; break
-      }
-      case 'drafts/delete': drafts = drafts.filter(d => d.id !== data.id); value = drafts; break
-      case 'drafts/clear': drafts = []; value = drafts; break
       case 'cancel': value = { cancelled: true }; break
       case 'generate': {
         requests++

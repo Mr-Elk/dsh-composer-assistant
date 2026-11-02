@@ -14,10 +14,10 @@ export type Config = Partial<AssistantConfig>
 export const name = 'composer-assistant'
 export const inject = ['llm', 'sessions', 'sessionProjections', 'storageDomain', 'typert', 'typertGateway']
 export const Config = schema.object({
-  optimizeEnabled: schema.boolean().default(true), stashEnabled: schema.boolean().default(true),
+  optimizeEnabled: schema.boolean().default(true),
   optimizationStrength: schema.union(['light', 'standard', 'deep']).default('standard'),
   nextEnabled: schema.boolean().default(true), completionEnabled: schema.boolean().default(true),
-  nextTrigger: schema.union(['auto', 'manual']).default('auto'),
+  language: schema.union(['follow', 'zh', 'en']).default('follow'),
   displayMode: schema.union(['ghost', 'panel']).default('ghost'),
   debounceMs: schema.natural().min(200).max(5000).default(600),
   minIntervalMs: schema.natural().min(500).max(30000).default(2000),

@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>输入助手 · 设计图 v4</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html {
+    --page: #ececeb;
+    --surface: #ffffff;
+    --surface-2: #f7f7f8;
+    --text: #0f1115;
+    --muted: #61666b;
+    --faint: #8b9096;
+    --line: rgba(0, 0, 0, .1);
+    --line-strong: rgba(0, 0, 0, .16);
+    --hover: rgba(0, 0, 0, .04);
+    --accent: #4176e6;
+    --accent-solid: #4176e6;
+    --accent-soft: #e8effc;
+    --chip: #f4f4f5;
+    --seg-on: #ffffff;
+    --knob: #ffffff;
+    --shadow: 0 0 0 .5px rgba(0, 0, 0, .06), 0 12px 32px rgba(0, 0, 0, .10);
+    --shadow-pop: 0 0 0 .5px rgba(0, 0, 0, .04), 0 3px 8px rgba(0, 0, 0, .04), 0 0 20px rgba(0, 0, 0, .05);
+    --shadow-knob: 0 1px 2px rgba(0, 0, 0, .2);
+  }
+  html[data-theme="dark"] {
+    --page: #141415;
+    --surface: #232324;
+    --surface-2: #1c1c1d;
+    --text: #f3f4f6;
+    --muted: #adb2b8;
+    --faint: #8b9096;
+    --line: rgba(255, 255, 255, .12);
+    --line-strong: rgba(255, 255, 255, .2);
+    --hover: rgba(255, 255, 255, .06);
+    --accent: #7aaaff;
+    --accent-solid: #4c88e4;
+    --accent-soft: #26324a;
+    --chip: #2c2c2e;
+    --seg-on: #3a3a3c;
+    --knob: #ffffff;
+    --shadow: 0 0 0 .5px rgba(0, 0, 0, .45), 0 12px 32px rgba(0, 0, 0, .45);
+    --shadow-pop: 0 0 0 .5px rgba(0, 0, 0, .3), 0 3px 8px rgba(0, 0, 0, .3), 0 0 20px rgba(0, 0, 0, .35);
+    --shadow-knob: 0 1px 2px rgba(0, 0, 0, .35);
+  }
+  body {
+    background: var(--page);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .stage { padding: 28px; }
+  .cap { margin: 0 0 12px; font-size: 12px; line-height: 18px; color: var(--muted); letter-spacing: .02em; }
+
+  /* ---------- settings ---------- */
+  .panel {
+    width: 784px;
+    padding: 28px 32px 24px;
+    background: var(--surface);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  .page-head { display: flex; flex-direction: column; gap: 4px; margin: 0 0 24px; }
+  .page-head h2 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text); }
+  .page-head p { margin: 0; font-size: 13px; line-height: 20px; color: var(--muted); }
+  .group { margin-top: 28px; }
+  .group:first-of-type { margin-top: 20px; }
+  .group > h3 { margin: 0 0 8px; font-size: 14px; line-height: 22px; font-weight: 500; color: var(--text); }
+  .rows { display: flex; flex-direction: column; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 74px; padding: 16px 0; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .row-main b { font-size: 14px; line-height: 22px; font-weight: 400; color: var(--text); }
+  .row-main small { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--muted); }
+  .control { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+  .select, .input {
+    display: inline-flex; align-items: center; justify-content: space-between; gap: 8px;
+    min-height: 28px; padding: 0 9px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+    color: var(--muted); font-size: 13px; line-height: 20px; font-weight: 500;
+  }
+  .select { min-width: 112px; }
+  .input { width: 180px; }
+  .input.num { width: 96px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
+  .input.is-placeholder { color: var(--faint); font-weight: 400; }
+  .switch {
+    flex: 0 0 auto; width: 44px; height: 24px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 24'%3E%3Crect width='44' height='24' rx='12' fill='%234c88e4'/%3E%3Ccircle cx='32' cy='12' r='10' fill='white'/%3E%3C/svg%3E") center / 44px 24px no-repeat;
+  }
+  .switch.off {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 24'%3E%3Crect width='44' height='24' rx='12' fill='%23c9ced6'/%3E%3Ccircle cx='12' cy='12' r='10' fill='white'/%3E%3C/svg%3E");
+  }
+  .field-block { padding-top: 14px; }
+  .textarea {
+    margin-top: 8px; min-height: 64px; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+    color: var(--faint); font-size: 13px; line-height: 20px;
+  }
+  .actions {
+    display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+    margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line);
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 28px; padding: 0 12px; border-radius: 8px;
+    background: transparent; color: var(--muted); font-size: 13px; line-height: 20px;
+  }
+  .btn.primary { height: 30px; padding: 0 14px; background: var(--accent-solid); color: #fff; font-weight: 500; }
+  .btn.primary.is-disabled { opacity: .42; }
+  .dirty { margin-right: auto; font-size: 12px; color: var(--faint); }
+
+  /* ---------- menu ---------- */
+  .menu {
+    width: 360px; padding: 4px; border-radius: 16px;
+    background: var(--surface); box-shadow: var(--shadow-pop);
+  }
+  .menu-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 8px 8px 6px; }
+  .menu-head b { font-size: 13px; line-height: 20px; font-weight: 600; }
+  .menu-head span { font-size: 12px; line-height: 18px; color: var(--muted); }
+  .qrow {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    width: 100%; height: 34px; padding: 0 8px; border-radius: 10px;
+    font-size: 13px; line-height: 20px; color: var(--text);
+  }
+  .qsum { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+  .sep { height: 1px; margin: 4px 8px; background: var(--line); }
+  .item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    width: 100%; min-height: 34px; padding: 0 8px; border-radius: 10px;
+    font-size: 13px; line-height: 20px; color: var(--text); text-align: left;
+  }
+  .item .right { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+  .sect { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 2px; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .note { margin: 0; padding: 2px 8px 6px; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .panel .note { margin: 0 0 2px; padding: 0; font-size: 13px; line-height: 20px; }
+  .about { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 8px 4px; }
+  .about .version { font-size: 13px; line-height: 20px; color: var(--muted); }
+  .about .link { font-size: 13px; line-height: 20px; color: var(--text); }
+  .more { margin: 0; padding: 4px 8px 6px; font-size: 12px; line-height: 18px; color: var(--muted); }
+
+  /* ---------- quick settings ---------- */
+  .quick { padding: 0 0 2px; }
+  .quick-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 2px; }
+  .quick-head b { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--muted); }
+  .quick-head span { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--muted); }
+  .qline { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 4px 8px; }
+  .qline label { font-size: 13px; line-height: 20px; color: var(--text); }
+  .seg { display: inline-flex; align-items: center; gap: 2px; height: 28px; padding: 2px; border-radius: 8px; background: var(--chip); }
+  .seg span {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 24px; padding: 0 9px; border-radius: 6px;
+    font-size: 12px; line-height: 18px; color: var(--muted);
+  }
+  .seg span.on { background: var(--seg-on); color: var(--text); font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+
+  /* ---------- composer ---------- */
+  .composer {
+    width: 720px; padding: 12px 0 10px;
+    background: var(--surface); border-radius: 20px; box-shadow: var(--shadow);
+  }
+  .draft { padding: 2px 18px 14px; font-size: 15px; line-height: 26px; }
+  .ghost { color: var(--faint); }
+  .keycap {
+    display: inline-block; margin-left: 6px; padding: 0 5px;
+    border: 1px solid var(--line); border-radius: 5px;
+    font-size: 10px; line-height: 15px; color: var(--muted); vertical-align: 1px;
+  }
+  .bar { display: flex; align-items: center; gap: 4px; padding: 0 10px; }
+  .plus {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--chip); color: var(--muted); font-size: 18px; line-height: 1;
+  }
+  .tool {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 28px; padding: 0 7px; border-radius: 8px;
+    color: var(--muted); font-size: 13px; line-height: 20px;
+  }
+  .tool.icon-only { padding: 0 5px; }
+  .spacer { flex: 1; }
+  .model { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; font-size: 13px; color: var(--muted); }
+  .send {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--accent-solid); color: #fff;
+  }
+
+  /* ---------- feedback ---------- */
+  .sheet { width: 720px; }
+  .demo + .demo { margin-top: 30px; }
+  .demo-label { margin: 0 0 10px; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .candidate {
+    display: flex; align-items: center; gap: 6px;
+    width: 560px; padding: 6px 6px 6px 12px;
+    background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-pop);
+  }
+  .candidate-text { flex: 1; font-size: 13px; line-height: 20px; }
+  .chip-btn { height: 28px; padding: 0 8px; border-radius: 8px; font-size: 13px; line-height: 20px; color: var(--muted); }
+  .chip-btn.accept { color: var(--accent); background: var(--accent-soft); font-weight: 500; }
+  .close { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; color: var(--muted); font-size: 16px; }
+  .mini-composer {
+    display: flex; align-items: flex-start;
+    width: 720px; min-height: 96px; margin-top: 12px; padding: 14px 18px;
+    background: var(--surface); border-radius: 20px; box-shadow: var(--shadow);
+  }
+  .mini-draft { font-size: 15px; line-height: 26px; color: var(--text); }
+  .notice {
+    display: flex; align-items: flex-start; gap: 8px;
+    width: max-content; max-width: 440px; margin-bottom: 8px; padding: 8px 12px;
+    background: var(--surface); border-radius: 12px; box-shadow: var(--shadow-pop);
+    font-size: 13px; line-height: 20px;
+  }
+  .notice svg { flex: 0 0 auto; margin-top: 3px; color: var(--muted); }
+  .notice.error svg { color: #d9534f; }
+  .notice-row { display: flex; flex-direction: column; align-items: flex-start; }
+  .notice-row + .mini-composer { margin-top: 12px; }
+
+  /* ---------- v3 toolbar ---------- */
+  .tool-group { display: inline-flex; align-items: center; gap: 2px; border-radius: 10px; }
+  .tool-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 7px; border-radius: 8px; color: var(--muted); font-size: 13px; line-height: 20px; }
+  .tool-btn.optimize { color: var(--text); font-weight: 500; }
+  .tool-btn.gear { padding: 0 6px; }
+  .tool-divider { width: 1px; height: 12px; margin: 0 1px; background: var(--line); }
+  .tool-btn .sparkle-lg { width: 16px; height: 16px; }
+  .tool-btn .gear-ic { width: 15px; height: 15px; }
+
+  /* ---------- v3 settings popover ---------- */
+  .popover { position: relative; width: 340px; padding: 6px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-pop); }
+  .pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 8px 6px; }
+  .pop-head b { font-size: 13px; line-height: 20px; font-weight: 600; }
+  .pop-head span { font-size: 12px; line-height: 18px; color: var(--muted); }
+  .pop-head .back { display: inline-flex; align-items: center; gap: 3px; }
+  .pop-head .pop-title { font-size: 13px; line-height: 20px; font-weight: 600; color: var(--text); }
+  .pop-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 4px 8px; border-radius: 10px; }
+  .pop-label { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; line-height: 20px; color: var(--text); }
+  .pop-label svg { flex: 0 0 auto; color: var(--muted); }
+  .pop-row .select { min-width: 112px; }
+  .pop-sep { height: 1px; margin: 4px 8px; background: var(--line); }
+  .pop-action { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; padding: 0 8px; border-radius: 10px; font-size: 13px; line-height: 20px; color: var(--text); }
+  .pop-action .right { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+  .pop-foot { margin: 0; padding: 4px 8px 6px; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .pop-note { margin: 0; padding: 0 8px 4px; font-size: 12px; line-height: 18px; color: var(--faint); }
+  .tip { position: absolute; left: 356px; top: 118px; width: 262px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-pop); font-size: 12px; line-height: 18px; color: var(--muted); z-index: 2; }
+
+  /* ---------- v3 settings rows ---------- */
+  .gtitle { display: flex; align-items: center; gap: 5px; margin: 0 0 4px; font-size: 14px; line-height: 22px; font-weight: 500; color: var(--text); }
+  .gtitle svg { flex: 0 0 auto; color: var(--muted); }
+  .srow { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 56px; padding: 14px 0; }
+  .srow + .srow { border-top: 1px solid var(--line); }
+  .srow.has-tip { min-height: 64px; }
+  .srow-main { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; line-height: 22px; font-weight: 400; color: var(--text); }
+  .srow-main svg { flex: 0 0 auto; color: var(--muted); }
+  .sfield { position: relative; padding: 14px 0; }
+  .sfield .srow-main { margin-bottom: 8px; }
+  .sfield .textarea { margin-top: 0; }
+  .row-tip { position: absolute; left: 150px; top: 50%; transform: translateY(-50%); width: 314px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-pop); font-size: 12px; line-height: 18px; color: var(--muted); z-index: 2; }
+
+  .pop-save { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 4px 8px 6px; }
+  .pop-cancel { font-size: 13px; line-height: 20px; color: var(--muted); }
+  .first-wrap { position: relative; padding-top: 100px; }
+  .hint-card { position: absolute; top: 0; right: 250px; width: 320px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-pop); font-size: 12px; line-height: 18px; color: var(--muted); }
+  .hint-card b { font-weight: 500; color: var(--text); }
+  .hint-card .hint-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+  .hint-card .hint-btn { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 7px; background: var(--accent-soft); color: var(--accent); font-size: 12px; line-height: 18px; font-weight: 500; }
+  .hint-card::after { content: ""; position: absolute; bottom: -5px; right: 96px; width: 8px; height: 8px; background: var(--surface); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: rotate(45deg); }
+  .focus-ring { box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .pop-head { align-items: center; }
+  .head-link { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .act-sect { padding: 8px 8px 2px; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .tabs { display: flex; align-items: center; gap: 2px; height: 30px; padding: 2px; margin: 0 8px 6px; border-radius: 9px; background: var(--chip); }
+  .tabs span { flex: 1; display: inline-flex; align-items: center; justify-content: center; height: 26px; border-radius: 7px; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .tabs span.on { background: var(--seg-on); color: var(--text); font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+  .pop-dirty { margin-right: auto; font-size: 12px; line-height: 18px; color: var(--faint); }
+  .about-value { font-size: 13px; line-height: 20px; color: var(--muted); }
+  .about-row { display: inline-flex; align-items: center; gap: 12px; }
+  .about-link { font-size: 13px; line-height: 20px; color: var(--text); }
+  .sel-wrap { position: relative; padding-top: 52px; }
+  .sel-chip { position: absolute; top: 0; left: 96px; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-pop); font-size: 12px; line-height: 18px; color: var(--text); }
+  .sel-chip svg { color: var(--muted); }
+  .sel-chip::after { content: ""; position: absolute; bottom: -5px; left: 18px; width: 8px; height: 8px; background: var(--surface); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: rotate(45deg); }
+  .sel { background: var(--accent-soft); border-radius: 3px; box-shadow: 0 0 0 2px var(--accent-soft); }
+  .result-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--line); font-size: 12px; line-height: 18px; color: var(--muted); }
+  .result-bar .ok { color: #2f8f5b; font-weight: 500; }
+  .result-bar .link { color: var(--accent); }
+  html[data-theme="dark"] .result-bar .ok { color: #67d391; }
+  .map { width: 760px; padding: 8px 20px; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); }
+  .map-head { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12px; line-height: 18px; color: var(--muted); }
+  .map-row { display: flex; justify-content: space-between; gap: 24px; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 13px; line-height: 20px; }
+  .map-row:last-child { border-bottom: 0; }
+  .map-row b { font-weight: 400; color: var(--text); }
+  .map-row span { color: var(--muted); text-align: right; }
+  .pop-title { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; line-height: 20px; font-weight: 600; color: var(--text); }
+  .pop-title svg { flex: 0 0 auto; color: var(--muted); }
+  .head-note { margin: 0 8px 8px; padding: 0; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .model-menu { width: 260px; margin: 8px 0 0 auto; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-pop); }
+  .model-opt { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; padding: 0 8px; border-radius: 8px; font-size: 13px; line-height: 20px; color: var(--text); }
+  .model-opt.on { background: var(--accent-soft); color: var(--accent); }
+  .model-opt .check { color: var(--accent); }
+  .model-note { margin: 0; padding: 6px 8px 4px; font-size: 11px; line-height: 16px; color: var(--muted); }
+  .collapse-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 14px 0; }
+  .collapse-summary { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .about-link-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
+  .about-link { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .about-dialog { width: 480px; padding: 8px 16px 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+  .about-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+  .about-head b { font-size: 14px; line-height: 22px; font-weight: 500; color: var(--text); }
+  .about-head span { font-size: 13px; color: var(--muted); }
+  .about-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; }
+  .about-row span:first-child { color: var(--text); }
+  .about-row span:last-child { color: var(--muted); }
+  .about-hint { margin: 0; font-size: 12px; line-height: 18px; color: var(--muted); }
+  .about-command { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+  .about-command code { flex: 1; min-width: 0; font: 11px/17px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); white-space: normal; overflow-wrap: anywhere; }
+  .about-command span { min-height: 26px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .about-action { color: var(--accent); }
+  .about-note { margin: 0; padding: 8px 0 0; font-size: 12px; line-height: 18px; color: var(--muted); }
+</style>
+</head>
+<body>
+<script>
+  const sparkle = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.7l1.32 3.78 3.78 1.32-3.78 1.32L8 11.9 6.68 8.12 2.9 6.8l3.78-1.32L8 1.7Z" fill="currentColor" opacity=".9"/><path d="M12.7 10.5l.55 1.55 1.55.55-1.55.55-.55 1.55-.55-1.55-1.55-.55 1.55-.55.55-1.55Z" fill="currentColor" opacity=".5"/></svg>`;
+  const chevron = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const chevronUp = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 7.5 6 4.5 9 7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const chevronRight = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 3 7.5 6 4.5 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const send = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 12.5V3.5M4.5 7 8 3.5 11.5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const info = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v3.1M8 5.3v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+  const alert = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2.3 14 13H2L8 2.3Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 6.2v3M8 11.2v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+  const folder = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2.2" y="3.6" width="11.6" height="8.8" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M2.2 6.4h11.6" stroke="currentColor" stroke-width="1.2"/></svg>`;
+
+  const sparkle16 = `<svg class="sparkle-lg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.7l1.32 3.78 3.78 1.32-3.78 1.32L8 11.9 6.68 8.12 2.9 6.8l3.78-1.32L8 1.7Z" fill="currentColor" opacity=".9"/><path d="M12.7 10.5l.55 1.55 1.55.55-1.55.55-.55 1.55-.55-1.55-1.55-.55 1.55-.55.55-1.55Z" fill="currentColor" opacity=".5"/></svg>`;
+  const gear = `<svg class="gear-ic" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>`;
+  const shield = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.7 13 3.6v4.2c0 3-2.1 5.1-5 6.4-2.9-1.3-5-3.4-5-6.4V3.6L8 1.7Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="m5.9 7.7 1.35 1.35L10.2 6.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  const row = (title, hint, control) => `
+    <div class="row">
+      <span class="row-main"><b>${title}</b>${hint ? `<small>${hint}</small>` : ''}</span>
+      <span class="control">${control}</span>
+    </div>`;
+  const toggle = (title, hint, on = true) => row(title, hint, `<span class="switch ${on ? '' : 'off'}"></span>`);
+  const select = (text, width = '') => `<span class="select"${width ? ` style="min-width:${width}"` : ''}>${text}${chevron}</span>`;
+  const num = value => `<span class="input num">${value}</span>`;
+  const textInput = placeholder => `<span class="input is-placeholder">${placeholder}</span>`;
+
+  const srow = (label, control, help = false) => `
+    <div class="srow">
+      <span class="srow-main">${label}${help ? info : ''}</span>
+      ${control}
+    </div>`;
+
+  const srowToggle = (label, on = true) => `
+    <div class="srow">
+      <span class="srow-main">${label}</span>
+      <span class="switch ${on ? '' : 'off'}"></span>
+    </div>`;
+
+  const advancedBlock = `
+      <section class="group">
+        <h3 class="gtitle">高级</h3>
+        <div class="rows">
+          ${srow('上下文上限', num('16000'), true)}
+          ${srow('建议超时', num('15'), true)}
+          ${srow('每小时调用上限', num('0'), true)}
+          ${srow('温度', num('0.7'), true)}
+        </div>
+        <div class="sfield">
+          <div class="srow-main"><b>额外指令</b>${info}</div>
+          <div class="textarea">例如：用更口语的中文；不要出现列表；优先给出下一步验证</div>
+        </div>
+      </section>`;
+
+  const settingsPage = (hover, advanced = false) => `
+    <p class="cap">${hover ? '设置页 · 悬浮圆圈 i 显示说明' : '设置 → 输入助手 · 选项和当前值'}</p>
+    <div class="panel">
+      <div class="page-head"><h2>输入助手</h2><p>管理下一句预测、输入续写与提示词优化。</p></div>
+
+      <section class="group">
+        <h3 class="gtitle">通用</h3>
+        <div class="rows">
+          ${srow('语言', select('跟随 DSH'))}
+        </div>
+      </section>
+
+      <section class="group">
+        <h3 class="gtitle">功能</h3>
+        <div class="rows">
+          ${srowToggle('提示词优化')}
+          ${srowToggle('回复后预测')}
+          ${srowToggle('输入续写')}
+        </div>
+      </section>
+
+      <section class="group">
+        <h3 class="gtitle">建议</h3>
+        <div class="rows">
+          ${hover
+            ? `<div class="srow has-tip"><span class="srow-main">建议长度${info}</span>${select('标准')}<div class="row-tip">控制建议的最大长度。短档更简洁，长档更完整；内容超出输入框可见区域时，将自动改用候选卡展示。</div></div>`
+            : srow('建议长度', select('标准'), true)}
+        </div>
+      </section>
+
+      <section class="group">
+        <h3 class="gtitle">优化</h3>
+        <div class="rows">
+          ${srow('优化强度', select('标准优化', '128px'), true)}
+        </div>
+      </section>
+
+      <section class="group">
+        <h3 class="gtitle">辅助模型</h3>
+        <div class="rows">
+          ${srow('模型', select('跟随输入框', '220px'), true)}
+        </div>
+      </section>
+
+      ${advanced ? advancedBlock : `
+      <section class="group">
+        <div class="rows">
+          <div class="collapse-row"><span class="srow-main">高级设置</span><span class="collapse-summary">5 项${chevron}</span></div>
+        </div>
+      </section>`}
+
+      <div class="actions">
+        <span class="btn">恢复默认</span>
+        <span class="btn primary is-disabled">保存</span>
+      </div>
+      <div class="about-link-row"><span class="about-link">关于 ${chevronRight}</span></div>
+    </div>`;
+
+  const settings = settingsPage(false);
+  const settingsHover = settingsPage(true);
+  const settingsAdvanced = settingsPage(false, true);
+
+  const popRow = (label, control, help = false) => `
+    <div class="pop-row">
+      <span class="pop-label">${label}${help ? info : ''}</span>
+      ${control}
+    </div>`;
+
+  const composer = `
+    <p class="cap">输入框 · 星形 16px，齿轮紧挨「优化」</p>
+    <div class="composer">
+      <div class="draft">请解释缓存失效<span class="ghost">，以及它对多用户并发的影响。<span class="keycap">Tab</span></span></div>
+      <div class="bar">
+        <span class="plus">+</span>
+        <span class="tool">${folder} 工作区内修改 ${chevron}</span>
+        <span class="spacer"></span>
+        <span class="tool-group">
+          <span class="tool-btn optimize">${sparkle16} 优化</span>
+          <span class="tool-divider"></span>
+          <span class="tool-btn gear">${gear}</span>
+        </span>
+        <span class="model">DeepSeek V4.1 Flash (latest) (CC) max ${chevron}</span>
+        <span class="send">${send}</span>
+      </div>
+    </div>`;
+
+  const popoverRows = `
+    ${popRow('回复后预测', '<span class="switch"></span>')}
+    ${popRow('输入续写', '<span class="switch"></span>')}
+    ${popRow('建议长度', select('标准'), true)}`;
+
+  const popover = `
+    <p class="cap">齿轮 → 快捷设置（只有设置，没有操作）</p>
+    <div class="popover">
+      <div class="pop-head"><span class="pop-title">输入助手${info}</span></div>
+      ${popoverRows}
+      <div class="pop-sep"></div>
+      <div class="pop-save"><span class="pop-dirty">尚未保存</span><span class="pop-cancel">取消</span><span class="btn primary">保存</span></div>
+    </div>`;
+
+  const popoverHover = `
+    <p class="cap">点击标题旁的 i，展开两行完整设置说明</p>
+    <div class="popover">
+      <div class="pop-head"><span class="pop-title">输入助手${info}</span></div>
+      <div class="head-note">常用设置。全部选项请到 DSH 设置的「输入助手」页面调整。</div>
+      ${popRow('回复后预测', '<span class="switch"></span>')}
+      ${popRow('输入续写', '<span class="switch"></span>')}
+      ${popRow('建议长度', select('标准'), true)}
+      <div class="pop-sep"></div>
+      <div class="pop-save"><span class="pop-dirty">尚未保存</span><span class="pop-cancel">取消</span><span class="btn primary">保存</span></div>
+    </div>`;
+
+  const context = `
+    <p class="cap">操作跟着情境走，不放进设置弹窗</p>
+    <div class="sheet">
+      <div class="demo">
+        <p class="demo-label">选中文字 → 浮出「保护」</p>
+        <div class="sel-wrap">
+          <div class="sel-chip">${shield} 保护</div>
+          <div class="composer">
+            <div class="draft">请解释<span class="sel">缓存失效</span>，以及它对多用户并发的影响。</div>
+            <div class="bar">
+              <span class="plus">+</span>
+              <span class="tool">${folder} 工作区内修改 ${chevron}</span>
+              <span class="spacer"></span>
+              <span class="tool-group">
+                <span class="tool-btn optimize">${sparkle16} 优化</span>
+                <span class="tool-divider"></span>
+                <span class="tool-btn gear">${gear}</span>
+              </span>
+              <span class="model">DeepSeek V4.1 Flash (latest) (CC) max ${chevron}</span>
+              <span class="send">${send}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="demo">
+        <p class="demo-label">优化完成后 → 「查看改动 / 撤销」在输入框上</p>
+        <div class="composer">
+          <div class="result-bar"><span class="ok">✓ 已优化</span><span class="link">查看改动</span><span class="link">撤销</span><span class="spacer"></span><span>复制原文</span></div>
+          <div class="draft">请说明缓存失效的机制，以及它对多用户并发的影响。</div>
+          <div class="bar">
+            <span class="plus">+</span>
+            <span class="tool">${folder} 工作区内修改 ${chevron}</span>
+            <span class="spacer"></span>
+            <span class="tool-group">
+              <span class="tool-btn optimize">${sparkle16} 优化</span>
+              <span class="tool-divider"></span>
+              <span class="tool-btn gear">${gear}</span>
+            </span>
+            <span class="model">DeepSeek V4.1 Flash (latest) (CC) max ${chevron}</span>
+            <span class="send">${send}</span>
+          </div>
+        </div>
+      </div>
+      <div class="demo">
+        <p class="demo-label">有建议 → 候选卡「换一条 / 采纳 / ×」；灰字建议按 Tab 采纳</p>
+        <div class="candidate">
+          <span class="candidate-text">如果缓存失效，多用户并发下容易出现缓存击穿；可以加互斥锁，并给过期时间加一点随机抖动。</span>
+          <span class="chip-btn">换一条</span>
+          <span class="chip-btn accept">采纳</span>
+          <span class="close">×</span>
+        </div>
+        <div class="mini-composer"><span class="mini-draft">请解释缓存失效</span></div>
+      </div>
+    </div>`;
+
+  const operationMap = `
+    <p class="cap">原来的操作 → 现在的位置</p>
+    <div class="map">
+      <div class="map-head"><span>原来的操作</span><span>现在的位置</span></div>
+      <div class="map-row"><b>保护选中原文</b><span>选中文字 → 浮出「保护」</span></div>
+      <div class="map-row"><b>查看改动</b><span>优化完成后 → 结果条「查看改动 / 撤销 / 复制原文」</span></div>
+      <div class="map-row"><b>换一条建议</b><span>有建议 → 候选卡「换一条」</span></div>
+      <div class="map-row"><b>暂停至下次编辑</b><span>候选卡 ×；灰字建议的 Esc 忽略待补</span></div>
+      <div class="map-row"><b>版本 / 更新说明</b><span>设置页底部「关于」</span></div>
+    </div>`;
+
+
+  const settingsModel = `
+    <p class="cap">辅助模型：选项直接来自 DSH 当前模型列表（示例）</p>
+    <div class="panel" style="padding: 28px 32px">
+      <section class="group" style="margin-top: 0">
+        <h3 class="gtitle">辅助模型</h3>
+        <div class="rows">
+          <div class="srow"><span class="srow-main">模型${info}</span><span class="select" style="min-width: 220px">跟随输入框${chevron}</span></div>
+        </div>
+        <div class="model-menu">
+          <div class="model-opt on"><span>跟随输入框</span><span class="check">✓</span></div>
+          <div class="model-opt"><span>DeepSeek V4.1 Flash</span></div>
+          <div class="model-opt"><span>DeepSeek V4.1 Pro</span></div>
+          <div class="model-opt"><span>Kimi K2</span></div>
+        </div>
+      </section>
+    </div>`;
+
+
+  const about = `
+    <p class="cap">关于 · 从设置页底部打开，不参与保存</p>
+    <div class="about-dialog">
+      <div class="about-head"><b>关于输入助手</b><span>×</span></div>
+      <div class="about-row"><span>版本</span><span>0.3.0</span></div>
+      <div class="about-row" style="display:block;border-top:1px solid var(--line);padding-top:12px">
+        <div style="font-size:13px;line-height:20px;color:var(--muted);margin-bottom:6px">升级方式</div>
+        <p class="about-hint">在 DSH 侧边栏打开「插件」，找到本插件后选择更新；也可以运行以下命令。</p>
+        <div class="about-command"><code>dsh plugin --profile desktop add dsh-composer-assistant</code><span>复制命令</span></div>
+        <p class="about-note">升级后需重启 DSH 生效。</p>
+      </div>
+    </div>`;
+
+  const firstRun = `
+    <p class="cap">首次使用提示 · 只出现一次</p>
+    <div class="first-wrap">
+      <div class="hint-card">
+        <b>试试这里：</b>预测下一句、继续输入与优化表达。可在设置中调整预测、续写与优化行为。
+        <div class="hint-actions"><span class="hint-btn">知道了</span></div>
+      </div>
+      <div class="composer">
+        <div class="draft">请解释缓存失效<span class="ghost">，以及它对多用户并发的影响。<span class="keycap">Tab</span></span></div>
+        <div class="bar">
+          <span class="plus">+</span>
+          <span class="tool">${folder} 工作区内修改 ${chevron}</span>
+          <span class="spacer"></span>
+          <span class="tool-group focus-ring">
+            <span class="tool-btn optimize">${sparkle16} 优化</span>
+            <span class="tool-divider"></span>
+            <span class="tool-btn gear">${gear}</span>
+          </span>
+          <span class="model">DeepSeek V4.1 Flash (latest) (CC) max ${chevron}</span>
+          <span class="send">${send}</span>
+        </div>
+      </div>
+    </div>`;
+
+  const templates = { settings, settingsHover, settingsAdvanced, settingsModel, about, composer, popover, popoverHover, context, operationMap, firstRun };
+  const params = new URLSearchParams(location.search);
+  const board = params.get('board') || 'composer';
+  const theme = params.get('theme') === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = theme;
+  document.body.innerHTML = `<div class="stage">${templates[board] || templates.settings}</div>`;
+  document.title = `输入助手 · ${board} · ${theme}`;
+</script>
+</body>
+</html>

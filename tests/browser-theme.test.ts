@@ -39,7 +39,8 @@ beforeAll(async () => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   url = `http://127.0.0.1:${(server.address() as { port: number }).port}`
   await mkdir('.test-runtime/web-theme', { recursive: true })
-  browser = await chromium.launch({ channel: 'msedge', headless: true })
+  try { browser = await chromium.launch({ channel: 'msedge', headless: true }) }
+  catch { browser = await chromium.launch({ channel: 'chrome', headless: true }) }
 }, 30000)
 afterAll(async () => { await browser?.close(); await new Promise<void>(resolve => server ? server.close(() => resolve()) : resolve()) })
 
@@ -58,24 +59,33 @@ async function surfaceContrast(page: Page, selector: string): Promise<number> {
   })
 }
 
+async function openPopover(page: Page) {
+  await page.getByRole('button', { name: '优化', exact: true }).waitFor()
+  const hint = page.locator('[data-dsh-ia-first-run]')
+  if (await hint.count()) {
+    await page.getByRole('button', { name: '知道了' }).click()
+    await browserExpect(hint).toHaveCount(0)
+  }
+  await page.getByRole('button', { name: '输入助手设置', exact: true }).click()
+  const pop = page.locator('.dsh-ia-pop')
+  await browserExpect(pop).toBeVisible()
+  return pop
+}
+
 describe('published DSH theme and clipped-composer regression', () => {
-  it.each(['light', 'dark'] as const)('keeps %s menus, controls, notices and candidate panels readable', async theme => {
+  it.each(['light', 'dark'] as const)('keeps %s popovers, result bars and candidate panels readable', async theme => {
     const page = await browser.newPage({ viewport: { width: 1024, height: 720 } })
     try {
       await page.goto(url)
       await page.evaluate(dark => document.body.toggleAttribute('data-ds-dark-theme', dark), theme === 'dark')
-      await page.getByRole('button', { name: '输入助手菜单', exact: true }).click()
-      const menu = page.locator('.dsh-ia-menu')
-      await browserExpect(menu).toBeVisible()
-      expect(await menu.evaluate(element => element.parentElement === document.body)).toBe(true)
-      expect(await surfaceContrast(page, '.dsh-ia-menu')).toBeGreaterThanOrEqual(4.5)
-      expect(await surfaceContrast(page, '.dsh-ia-menu-row')).toBeGreaterThanOrEqual(4.5)
-      const box = (await menu.boundingBox())!
-      expect(box.y).toBeGreaterThanOrEqual(11)
-      expect(box.y + box.height).toBeLessThanOrEqual(709)
-      await browserExpect(menu.getByText('输入助手', { exact: true })).toBeInViewport()
-      await page.getByRole('button', { name: '输入助手菜单', exact: true }).click()
-      // Settings now live on the settings page; drive the same controller directly.
+      const pop = await openPopover(page)
+      expect(await pop.evaluate(element => element.parentElement === document.body)).toBe(true)
+      expect(await surfaceContrast(page, '.dsh-ia-pop')).toBeGreaterThanOrEqual(4.5)
+      const popBox = (await pop.boundingBox())!
+      expect(popBox.y).toBeGreaterThanOrEqual(11)
+      expect(popBox.y + popBox.height).toBeLessThanOrEqual(709)
+      await browserExpect(pop.locator('.dsh-ia-pop-title')).toBeInViewport()
+      await page.getByRole('button', { name: '输入助手设置', exact: true }).click()
       await page.evaluate(async () => {
         await (window as any).fixture.runtime.controllerFor('web-smoke').updateSettings({ completionEnabled: true, displayMode: 'panel' })
       })
@@ -86,28 +96,26 @@ describe('published DSH theme and clipped-composer regression', () => {
       await page.getByRole('textbox', { name: '测试草稿' }).press('Tab')
       await browserExpect(page.getByRole('textbox', { name: '测试草稿' })).toHaveText('请解释这段代码的时间复杂度。')
       await page.getByRole('button', { name: '优化', exact: true }).click()
-      await browserExpect(page.locator('body > .dsh-ia-notice')).toBeVisible()
-      expect(await surfaceContrast(page, 'body > .dsh-ia-notice')).toBeGreaterThanOrEqual(4.5)
-      await page.getByRole('button', { name: '输入助手菜单', exact: true }).click()
+      await browserExpect(page.locator('body > .dsh-ia-result')).toBeVisible()
+      expect(await surfaceContrast(page, 'body > .dsh-ia-result')).toBeGreaterThanOrEqual(4.5)
       await page.screenshot({ path: `.test-runtime/web-theme/${theme}.png` })
     } finally { await page.close() }
   }, 20000)
 
-  it('keeps the menu title and all controls reachable in a small clipped viewport', async () => {
+  it('keeps the popover title and all controls reachable in a small clipped viewport', async () => {
     const page = await browser.newPage({ viewport: { width: 420, height: 340 } })
     try {
       await page.goto(url)
       await page.evaluate(() => document.body.setAttribute('data-ds-dark-theme', ''))
-      await page.getByRole('button', { name: '输入助手菜单', exact: true }).click()
-      const menu = page.locator('.dsh-ia-menu')
-      await browserExpect(menu.getByText('输入助手', { exact: true })).toBeInViewport()
-      const box = (await menu.boundingBox())!
+      const pop = await openPopover(page)
+      await browserExpect(pop.locator('.dsh-ia-pop-title')).toBeInViewport()
+      const box = (await pop.boundingBox())!
       expect(box.y).toBeGreaterThanOrEqual(11)
       expect(box.y + box.height).toBeLessThanOrEqual(329)
-      expect(await menu.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
-      await menu.getByText('辅助模型设置', { exact: true }).click()
-      await menu.getByRole('button', { name: '保存模型设置', exact: true }).scrollIntoViewIfNeeded()
-      await browserExpect(menu.getByRole('button', { name: '保存模型设置', exact: true })).toBeInViewport()
+      await browserExpect(pop.getByRole('checkbox', { name: '回复后预测' })).toBeVisible()
+      await browserExpect(pop.getByRole('checkbox', { name: '输入续写' })).toBeVisible()
+      await browserExpect(pop.getByRole('combobox', { name: '建议长度' })).toBeVisible()
+      expect(await surfaceContrast(page, '.dsh-ia-pop')).toBeGreaterThanOrEqual(4.5)
       await page.screenshot({ path: '.test-runtime/web-theme/small-dark.png' })
     } finally { await page.close() }
   }, 20000)
@@ -116,9 +124,10 @@ describe('published DSH theme and clipped-composer regression', () => {
     const page = await browser.newPage({ viewport: { width: 1024, height: 720 } })
     try {
       await page.goto(url)
-      await page.getByRole('button', { name: '输入助手菜单', exact: true }).click()
-      await page.getByLabel('输入续写', { exact: true }).check()
-      await page.getByRole('button', { name: '输入助手菜单', exact: true }).click()
+      const pop = await openPopover(page)
+      await pop.getByLabel('输入续写', { exact: true }).check()
+      await pop.getByRole('button', { name: '保存' }).click()
+      await browserExpect(page.locator('.dsh-ia-pop')).toHaveCount(0)
       await page.evaluate(() => { (window as any).fixture.setDraft('请解释这段代码的时间'); (window as any).fixture.focus() })
       const ghost = page.locator('.dsh-ia-ghost')
       await browserExpect(ghost).toBeVisible()

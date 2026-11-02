@@ -1,10 +1,13 @@
 {
   "name": "dsh-composer-assistant",
-  "version": "0.2.0",
-  "description": "DSH 输入助手：下一句预测、输入续写、提示词优化与草稿暂存（dsh-input-assistant 的增强 fork）",
+  "version": "0.3.0",
+  "description": "DSH 输入助手：下一句预测、输入续写、提示词优化（dsh-input-assistant 的增强 fork）",
   "type": "module",
   "license": "MIT",
   "author": "dsh-input-assistant contributors (fork)",
+  "repository": { "type": "git", "url": "git+https://github.com/Somnus678/dsh-input-assistant.git" },
+  "homepage": "https://github.com/Somnus678/dsh-input-assistant#readme",
+  "bugs": { "url": "https://github.com/Somnus678/dsh-input-assistant/issues" },
   "keywords": [
     "dsh",
     "deepseek-harness",

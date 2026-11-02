@@ -5,7 +5,7 @@ import { Session, type SessionId } from '@deepseek-ai/dsh-session'
 import { BlockAssembler, type GenerateOptions } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-typert-registry'
-import { AssistantError, CallBudget, SessionScheduler, prepareGeneration, finishGeneration, PLUGIN_NAME, PLUGIN_VERSION, PACKAGE_URL, type AssistantConfig, type AssistantStatus, type GenerationRequest, type GenerationResult, type ModelRoute, type UpdateCheckResult } from '../core/index'
+import { AssistantError, CallBudget, SessionScheduler, prepareGeneration, finishGeneration, type AssistantConfig, type AssistantStatus, type GenerationRequest, type GenerationResult, type ModelRoute, type ModelCatalog, type ModelOption } from '../core/index'
 import { AssistantStorage } from './storage'
 import { emptyTranscript } from './transcript'
 import type { RpcPayload } from './rpc'
@@ -61,6 +61,24 @@ export class AssistantHostRuntime {
   private sessionRoute(session: Session): ModelRoute | undefined {
     const route = session.requestHeader()?.config
     return route?.provider && route.model ? { provider: route.provider, model: route.model } : undefined
+  }
+
+  /** Read-only catalog of models configured in DSH; no settings or credentials are touched. */
+  async models(signal: AbortSignal): Promise<ModelCatalog> {
+    signal.throwIfAborted()
+    const models: ModelOption[] = []
+    const failures: ModelCatalog['failures'] = []
+    for (const provider of this.ctx.llm.listProviders()) {
+      signal.throwIfAborted()
+      try {
+        for (const model of await this.ctx.llm.listModels(provider.id)) {
+          models.push({ provider: provider.id, providerName: provider.name, model: model.id, name: model.name })
+        }
+      } catch (error) {
+        failures.push({ provider: provider.id, message: error instanceof Error ? error.message : '模型列表加载失败' })
+      }
+    }
+    return { models, failures }
   }
 
   async status(id: string, signal: AbortSignal): Promise<AssistantStatus> {
@@ -164,37 +182,8 @@ export class AssistantHostRuntime {
 
   cancel(id: string, requestId?: string): boolean { return this.scheduler.cancel(id, requestId) }
   changed(session: Session): void { this.scheduler.cancel(session.id) }
-  /** Reuse a recent registry answer so repeated clicks do not hammer npm. */
-  private async checkUpdate(signal: AbortSignal): Promise<UpdateCheckResult> {
-    if (this.updateCache && Date.now() - this.updateCache.at < 5 * 60_000) return this.updateCache.result
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 6000)
-    const abort = () => controller.abort()
-    signal.addEventListener('abort', abort, { once: true })
-    let result: UpdateCheckResult
-    try {
-      const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(PLUGIN_NAME)}/latest`, {
-        signal: controller.signal, headers: { accept: 'application/json' },
-      })
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      const body = await response.json() as { version?: unknown }
-      const latest = typeof body.version === 'string' ? body.version : null
-      result = { current: PLUGIN_VERSION, latest, url: PACKAGE_URL, error: latest ? null : 'EMPTY' }
-    } catch (error) {
-      if (signal.aborted) throw error
-      if (controller.signal.aborted && !signal.aborted) result = { current: PLUGIN_VERSION, latest: null, url: PACKAGE_URL, error: 'TIMEOUT' }
-      else result = { current: PLUGIN_VERSION, latest: null, url: PACKAGE_URL, error: 'NETWORK' }
-    } finally {
-      clearTimeout(timer)
-      signal.removeEventListener('abort', abort)
-    }
-    this.updateCache = { at: Date.now(), result }
-    return result
-  }
-
   dispose(): void { this.disposed = true; this.scheduler.dispose() }
 
-  private updateCache: { at: number; result: UpdateCheckResult } | null = null
   /** Sliding-window counter for automatic auxiliary calls; the limit comes from settings. */
   private readonly budget = new CallBudget()
 
@@ -214,34 +203,11 @@ export class AssistantHostRuntime {
         return result
       }
       case 'status': return this.status(sessionRequest.parse(payload.data).sessionId, signal)
-      case 'update/check': return this.checkUpdate(signal)
+      case 'models/list': return this.models(signal)
       case 'cancel': {
         const request = z.object({ sessionId: stringId, requestId: stringId.optional() }).parse(payload.data)
         await this.session(request.sessionId, signal)
         return { cancelled: this.cancel(request.sessionId, request.requestId) }
-      }
-      case 'drafts/list': {
-        const request = sessionRequest.parse(payload.data)
-        await this.session(request.sessionId, signal)
-        return this.storage.list(request.sessionId)
-      }
-      case 'drafts/save': {
-        const request = z.object({ sessionId: stringId, text: z.string().max(32_000), replaceId: stringId.optional() }).parse(payload.data)
-        await this.session(request.sessionId, signal)
-        if (!(await this.storage.settings()).stashEnabled) {
-          throw new AssistantError('DISABLED', '草稿暂存已关闭，请在输入助手设置中启用；已有草稿仍可查看或删除')
-        }
-        return this.storage.save(request.sessionId, request.text, request.replaceId)
-      }
-      case 'drafts/delete': {
-        const request = z.object({ sessionId: stringId, id: stringId }).parse(payload.data)
-        await this.session(request.sessionId, signal)
-        return this.storage.delete(request.sessionId, request.id)
-      }
-      case 'drafts/clear': {
-        const request = sessionRequest.parse(payload.data)
-        await this.session(request.sessionId, signal)
-        return this.storage.delete(request.sessionId)
       }
     }
   }

@@ -3,8 +3,9 @@
  * Publish gate: catches the failure mode we actually hit — publishing a tarball
  * without `lib/` because the build output lives outside git.
  */
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 
 const fail = (message) => { process.stderr.write(`publish blocked: ${message}\n`); process.exit(1) }
 const pkg = JSON.parse(await readFile('package.json', 'utf8'))
@@ -18,9 +19,35 @@ if (!pkg.dsh?.bundle?.patch) problems.push('缺少 dsh.bundle.patch，插件无�
 if (!pkg.dsh?.client?.platform) problems.push('缺少 dsh.client.platform，浏览器半侧不会被加载')
 if (!existsSync('cordis.patch.yml')) problems.push('缺少 cordis.patch.yml')
 
-for (const file of ['lib/index.js', 'lib/index.d.ts', 'lib/client.js', 'lib/core.js', 'README.md', 'LICENSE']) {
+for (const file of ['lib/index.js', 'lib/index.d.ts', 'lib/client.js', 'lib/core.js', 'lib/core/budget.d.ts', 'lib/core/i18n.d.ts', 'README.md', 'LICENSE']) {
   if (!existsSync(file)) problems.push(`缺少发布所需文件：${file}`)
 }
+// A stale lib/ passed the old gate once. Fail when any source file is newer
+// than the oldest emitted declaration/bundle, so publish always follows a build.
+async function newestSourceTime(directory) {
+  let newest = 0
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (entry.name.startsWith('._')) continue
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) newest = Math.max(newest, await newestSourceTime(path))
+    else if (/\.(?:ts|tsx)$/u.test(entry.name)) newest = Math.max(newest, (await stat(path)).mtimeMs)
+  }
+  return newest
+}
+async function oldestLibTime(directory) {
+  let oldest = Infinity
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (entry.name.startsWith('._')) continue
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) oldest = Math.min(oldest, await oldestLibTime(path))
+    else if (/\.(?:js|d\.ts)$/u.test(entry.name)) oldest = Math.min(oldest, (await stat(path)).mtimeMs)
+  }
+  return oldest
+}
+const sourceTime = await newestSourceTime('src')
+const libTime = await oldestLibTime('lib')
+if (Number.isFinite(libTime) && sourceTime > libTime) problems.push('lib/ 比 src/ 旧，先运行 pnpm build')
+
 if (existsSync('lib/client.js')) {
   const client = await readFile('lib/client.js', 'utf8')
   if (!client.includes(`id:"${pkg.name}"`)) problems.push(`lib/client.js 的模块 id 与包名 ${pkg.name} 不一致`)

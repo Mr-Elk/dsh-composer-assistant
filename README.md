@@ -1,36 +1,68 @@
-# DSH 输入助手（dsh-composer-assistant）
+# DSH 输入助手
 
-给 DeepSeek Harness 的输入框加一层“下一句”能力：**下一句预测、输入续写、提示词优化**，
-全部在本地输入框里完成，采纳后仍由你决定是否发送。
+在 DeepSeek Harness 的输入框里，帮你想下一句。
 
-本包是 [`dsh-input-assistant`](https://github.com/Somnus678/dsh-input-assistant)（MIT）的增强 fork，
-包名不同、可与之并存；原项目版权归原作者。
+不是自动回复，也不是替你发送。它只在输入框里给建议：`Tab` 采纳，`Esc` 忽略，最后发什么仍由你决定。
+
+<img src="docs/images/composer.png" alt="DSH 输入框里的优化按钮和设置齿轮" width="860">
+
+## 0.3.0 的变化
+
+- **中文 / English 切换**：可跟随 DSH，也可固定中文或 English；提示、报错和设置页一起切换。
+- **错误码化**：配置校验、浏览器兜底异常和宿主错误都有对应文案，不再中英混排。
+- **设置页重做**：通用 / 功能 / 建议 / 优化 / 辅助模型 / 高级；保存条只在有改动时可用。
+- **开关重画**：44 × 24 SVG 轨道，20px 正圆；不再依赖 input 伪元素。
+- **反馈更轻**：保存和恢复用标题区 toast；错误固定在保存条上方。
+- **齿轮弹窗更清楚**：标题旁 `i` 展开两行说明，不再用悬浮提示遮住开关。
+- **草稿恢复**：关掉设置再打开，未保存的修改会恢复并提示。
+
+## 三个功能
+
+| 功能 | 它会做什么 |
+| --- | --- |
+| 下一句预测 | 助手回复结束后，在空输入框里给出你下一句最可能说的话 |
+| 输入续写 | 根据当前草稿和光标位置继续写；长建议放不下时改用浮动候选卡 |
+| 提示词优化 | 把草稿或选中文字改写成可发送的表达；可看 diff、一次性撤销、复制原文 |
+
+不满意可以「换一条」；同一轮内重试，不消耗新的轮次。
+
+## 界面
+
+| 中文设置页 | English |
+| --- | --- |
+| <img src="docs/images/settings-zh.png" alt="中文设置页" width="420"> | <img src="docs/images/settings-en.png" alt="English settings" width="420"> |
+
+| 齿轮弹窗 | 关于 |
+| --- | --- |
+| <img src="docs/images/popover.png" alt="齿轮弹窗和两行内联说明" width="420"> | <img src="docs/images/about.png" alt="关于输入助手" width="420"> |
+
+设置页按分组展示；输入框旁只放 `✦ 优化` 和 `⚙`。保护选中、查看改动、撤销、复制原文、换一条这些一次性动作在输入区就地出现，不塞进设置弹窗。
 
 ## 安装
 
+要求 DSH `>=0.2.1-rc.2 <0.3.0-0`，当前在 `0.2.1-rc.5` 上验证。
+
 ```shell
-# 0.3.0 发布后可用
+# npm 包发布后可用
 dsh plugin --profile desktop add dsh-composer-assistant
 ```
 
-或从本地压缩包安装：
+发布前从本地压缩包安装：
 
 ```shell
 dsh plugin --profile desktop add ./dist/dsh-composer-assistant-0.3.0.tgz
 ```
 
-要求 DSH `>=0.2.1-rc.2 <0.3.0-0`（在 `0.2.1-rc.5` 上验证）。
+更新或回滚：
 
-## 功能
+```shell
+dsh plugin --profile desktop remove dsh-composer-assistant
+dsh plugin --profile desktop add <包或版本>
+```
 
-| 功能 | 说明 |
-| --- | --- |
-| 下一句预测 | 助手回复结束后，在空输入框里给出你下一句最可能说的话；`Tab` 采纳、`Esc` 忽略 |
-| 输入续写 | 按当前草稿与光标位置继续写；长建议放不下时自动改用浮动候选卡 |
-| 提示词优化 | 把草稿或选中文字改写成可发送的表达；可查看 diff、一次性撤销、复制原文 |
-| 换一条 | 同一轮内对建议不满意可以重新要一条，不消耗新的轮次 |
+更新后重启 DSH。DSH 没有第三方插件自动更新；升级走侧边栏「插件」页，或上面的命令。
 
-## 快捷键
+## 使用
 
 | 动作 | 按键 |
 | --- | --- |
@@ -38,11 +70,11 @@ dsh plugin --profile desktop add ./dist/dsh-composer-assistant-0.3.0.tgz
 | 忽略建议 | `Esc` |
 | 停止当前轮次 | 连按两次 `Esc`（DSH 原有行为，不受影响） |
 
-`/` 命令菜单或 `@` 引用菜单打开时，`Tab` 归菜单所有，插件不会抢键；中文输入法组字期间不发请求。
+`/` 命令菜单或 `@` 引用菜单打开时，`Tab` 归菜单所有，插件不会抢键。中文输入法组字期间不发请求。
+
+第一次打开输入框会出现一次入门提示，指向优化和齿轮；点“知道了”、`Esc` 或点外面关闭，之后不再出现。
 
 ## 设置
-
-设置 → 输入助手，按通用、功能、建议、优化、辅助模型和高级分组；能判断的才露出，实现参数保持默认：
 
 | 分组 | 项 | 默认 | 说明 |
 | --- | --- | --- | --- |
@@ -53,57 +85,49 @@ dsh plugin --profile desktop add ./dist/dsh-composer-assistant-0.3.0.tgz
 | 辅助模型 | 模型 | 跟随输入框 | 从 DSH 模型列表选；辅助调用单独计费 |
 | 高级 | 上下文上限 | 16000 | 参与建议的对话上下文字数 |
 | 高级 | 建议超时 | 15 秒 | 5–60 秒，慢模型可放宽 |
-| 高级 | 每小时调用上限 | 0 | 全局上限，只计自动建议；0 不限制，手动优化与「换一条」不计入 |
+| 高级 | 每小时调用上限 | 0 | 只计自动建议；0 不限制 |
 | 高级 | 温度 | 0.7 | 0.3 稳定 / 0.7 平衡 / 1.0 发散 |
 | 高级 | 额外指令 | 空 | 追加到系统提示词，≤500 字 |
 
-以下参数**不暴露**，由代码固定：续写防抖 600ms、最小请求间隔 2s、
-草稿上限 8000 字、改写增长上限 3×、推理档自动取最低。
+固定参数不暴露：续写防抖 600ms、最小请求间隔 2s、草稿上限 8000 字、改写增长上限 3×。
 
-输入框旁是 `✦ 优化` + `⚙`：齿轮只放三项设置（回复后预测、输入续写、建议长度），完整设置仍走 DSH 设置。保护选中、查看改动、撤销、复制原文、换一条这类一次性动作在输入区就地出现。
-提示气泡：信息类 6 秒、错误类 10 秒自动消失，点击或 `Esc` 立即关闭。
+保存行为：
 
-第一次打开输入框会出现一次入门提示，指向 `✦ 优化` 和 `⚙`；点“知道了”、`Esc` 或点外面关闭，之后不再出现。
+- 设置页和齿轮弹窗共用同一份草稿，只提交改动字段。
+- 没有改动时保存置灰；取消或点外面丢弃未保存改动。
+- 点“恢复默认”只重置表单，再点“保存”才写入。
+- 保存成功显示标题区 toast；错误显示在保存条上方。
+- 关掉设置再打开，未保存的修改会恢复并提示。
 
-## 升级
+## 费用和隐私
 
-DSH 目前**没有第三方插件的自动更新**，也没有版本选择器。升级方式：
-
-1. 插件管理里卸载 `dsh-composer-assistant`，再重新安装（会装到 npm 上的最新版）；
-2. 或命令行：
-
-```shell
-dsh plugin --profile desktop remove dsh-composer-assistant
-dsh plugin --profile desktop add dsh-composer-assistant
-```
-
-DSH 目前没有第三方插件的自动更新。升级请在侧边栏「插件」里更新，或使用上面的命令行；更新后重启 DSH。
-
-### 回滚
-
-1. 先卸载当前版本：
-   `dsh plugin --profile desktop remove dsh-composer-assistant`
-2. 安装上一版压缩包或指定版本：
-   `dsh plugin --profile desktop add /path/to/dsh-composer-assistant-<上一版>.tgz`
-3. 重启 DSH。设置保存在本地，回滚不会清掉设置；从 v4 回到 v3 时，新键会被旧版忽略。
+- 预测、续写和优化都只调用 DSH 已配置的模型；不另外上传草稿。
+- 如果选了固定辅助模型，这部分调用按该模型单独计费。
+- 插件不自动发送消息，不修改你的 DSH 模型配置。
+- 测试和浏览器夹具使用本地替身，不消耗付费 token。
 
 ## 已知限制
 
-- 灰字只能渲染在输入框的可见区域内，更长的建议一律走候选卡
-- IME 组字期间不发请求；真实中文输入法行为依赖浏览器与输入法，仓库只有单测覆盖
-- 本地开发：仓库若位于 exFAT 卷，`pnpm` 无法建 store，请用 `./scripts/local-dev.sh`
-  （同步到 APFS 临时目录构建，产物回写 `dist/`）
+- 灰字只能画在输入框可见区域内；更长的建议走候选卡。
+- `Tab` 在 `/`、`@` 菜单打开时归菜单所有。
+- 中文输入法组字期间不发请求；真实 IME 行为依赖系统和输入法。
+- 真实 Edge 窗口、真实 `@` 菜单和真实候选卡仍属于验收缺口；当前以 Chrome 和 DSH 桌面端验证为主。
+- 仓库若在 exFAT 卷上遇到 pnpm 报错，可用 `./scripts/local-dev.sh` 同步到 APFS 临时目录构建。
 
 ## 开发
 
 ```shell
 pnpm typecheck
-pnpm test          # Edge 主题测试需要本机安装 Microsoft Edge
+pnpm test
 pnpm build
-pnpm pack --pack-destination dist
+pnpm test:package
+node scripts/smoke-web.mjs
 ```
+
+当前：17 个测试文件、163 条测试通过；Chrome 冒烟 0 次付费调用。
 
 ## 许可
 
-MIT。本项目基于 `dsh-input-assistant`（作者 Somnus678 与贡献者）修改，保留原 MIT 许可与版权声明；
-新增部分同样以 MIT 发布。
+MIT。本项目基于 [`dsh-input-assistant`](https://github.com/Somnus678/dsh-input-assistant)（作者 Somnus678 与贡献者）修改，保留原 MIT 许可与版权声明；新增部分同样以 MIT 发布。
+
+本 fork：[`Mr-Elk/dsh-input-assistant`](https://github.com/Mr-Elk/dsh-input-assistant)

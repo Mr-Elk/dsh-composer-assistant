@@ -7,7 +7,7 @@
 - 工作区：干净
 - 测试前已清理 macOS `._*` 元数据；`vitest`/`tsconfig` 已排除 `**/._*`
 - 远程：已添加 `origin`（`https://github.com/Somnus678/dsh-input-assistant.git`），未推送
-- tag：尚未创建，等待最后一次真实宿主验收
+- tag：`v0.3.0`（本地 annotated tag，未推送）
 
 ## npm
 
@@ -24,9 +24,13 @@
 - 已安装到桌面 profile
 - 版本和 `repository` 元数据已确认
 
-## 等待
+## 验收
 
-- 重启桌面 DSH，加载最新的宿主端代码。
+- 已在 2026-11-02 16:52 新进程上完成，结论 PASS，见 [`P6-FINAL-ACCEPTANCE-2026-11-02.md`](P6-FINAL-ACCEPTANCE-2026-11-02.md)。
+
+## 剩余
+
+- 没有需要等待的宿主重启。
 - 重启后做最后一次真实宿主验收：
   - 设置页、语言切换
   - 成功/恢复 toast

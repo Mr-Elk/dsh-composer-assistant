@@ -179,11 +179,11 @@ describe('composed browser surfaces', () => {
     fireEvent.click(screen.getByRole('button', { name: '输入助手设置' }))
     const info = screen.getByRole('button', { name: '说明: 输入助手' })
     fireEvent.click(info)
-    expect(screen.getByText(/常用设置。全部选项请到 DSH 设置/)).toBeTruthy()
+    expect(document.getElementById('dsh-ia-pop-note')?.textContent).toContain('完整选项在 DSH 设置')
     expect(screen.queryByRole('tooltip')).toBeNull()
     expect(info.getAttribute('aria-expanded')).toBe('true')
     fireEvent.click(info)
-    expect(screen.queryByText(/常用设置。全部选项请到 DSH 设置/)).toBeNull()
+    expect(document.getElementById('dsh-ia-pop-note')).toBeNull()
   })
   it('shows a protect chip for a selection and locks the selected text', async () => {
     const f = uiFixture('请优化表达')

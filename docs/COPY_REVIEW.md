@@ -86,7 +86,7 @@
 | `popover.suggestionLength` | 建议长度 | Suggestion length | 通过 |
 | `popover.save` | 保存 | Save | 通过 |
 | `popover.cancel` | 取消 | Cancel | 通过 |
-| `popover.fullSettings` | 常用设置。全部选项请到 DSH 设置的「输入助手」页面调整。 | Common settings. All options are on the Input assistant page in DSH Settings. | 通过 |
+| `popover.fullSettings` | 常用设置。<br>完整选项在 DSH 设置的「输入助手」页面。 | Common settings.<br>All options are on the Input assistant page in DSH Settings. | 通过 |
 | `firstRun.title` | 输入助手 | Input assistant | 通过 |
 | `firstRun.text` | 预测下一句、继续输入与优化表达 | Predict the next sentence, continue writing, and improve expression | 通过 |
 | `firstRun.settings` | 可在设置中调整预测、续写与优化行为 | Adjust prediction, completion, and optimization in settings | 通过 |

@@ -19,7 +19,7 @@ if (!pkg.dsh?.bundle?.patch) problems.push('缺少 dsh.bundle.patch，插件无�
 if (!pkg.dsh?.client?.platform) problems.push('缺少 dsh.client.platform，浏览器半侧不会被加载')
 if (!existsSync('cordis.patch.yml')) problems.push('缺少 cordis.patch.yml')
 
-for (const file of ['lib/index.js', 'lib/index.d.ts', 'lib/client.js', 'lib/core.js', 'lib/core/budget.d.ts', 'lib/core/i18n.d.ts', 'README.md', 'LICENSE']) {
+for (const file of ['lib/index.js', 'lib/index.d.ts', 'lib/client.js', 'lib/core.js', 'lib/core/budget.d.ts', 'lib/core/i18n.d.ts', 'README.md', 'README.en.md', 'LICENSE']) {
   if (!existsSync(file)) problems.push(`缺少发布所需文件：${file}`)
 }
 // A stale lib/ passed the old gate once. Fail when any source file is newer
@@ -58,7 +58,7 @@ const declared = /PLUGIN_VERSION = '([^']+)'/.exec(versionSource)?.[1]
 if (declared !== pkg.version) problems.push(`src/core/version.ts 的版本 ${declared ?? '缺失'} 与 package.json ${pkg.version} 不一致`)
 
 const files = pkg.files ?? []
-for (const required of ['lib', 'cordis.patch.yml', 'README.md', 'LICENSE']) {
+for (const required of ['lib', 'cordis.patch.yml', 'README.md', 'README.en.md', 'LICENSE']) {
   if (!files.includes(required)) problems.push(`package.json 的 files 未包含 ${required}`)
 }
 

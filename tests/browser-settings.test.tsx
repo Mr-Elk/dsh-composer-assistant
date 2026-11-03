@@ -45,6 +45,20 @@ function settingsFixture(options: { models?: ModelOption[]; modelsError?: boolea
 }
 
 describe('DSH input assistant settings section', () => {
+  it('restores unsaved settings after the panel unmounts and reopens in the same tab', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.change(screen.getByLabelText('优化强度'), { target: { value: 'deep' } })
+
+    cleanup()
+    expect(sessionStorage.length).toBeGreaterThan(0)
+    render(<AssistantSettings {...{ runtime: f.runtime, close() {} } as ComponentProps<typeof AssistantSettings>} />)
+
+    await screen.findByText('已恢复上次未保存的修改。')
+    expect((screen.getByLabelText('优化强度') as HTMLSelectElement).value).toBe('deep')
+    expect(f.setters).toHaveLength(0)
+  })
+
   it('does not overwrite another switch changed after the settings page was opened', async () => {
     const f = settingsFixture()
     await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())

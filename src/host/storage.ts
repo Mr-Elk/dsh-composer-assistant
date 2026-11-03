@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { defineDomain, domainTable, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import type { AssistantConfig } from '../core/types'
 import { resolveConfig, resolveStoredConfig } from '../core/config'
+import { CallBudget } from '../core/budget'
 
 /**
  * Legacy draft-stash table. The feature was removed before 0.2.0; the table is
@@ -10,6 +11,13 @@ import { resolveConfig, resolveStoredConfig } from '../core/config'
 const legacyDraftSchema = z.object({ id: z.string().min(1), text: z.string().min(1).max(32_000), createdAt: z.number().int().nonnegative() })
 const legacyDraftsSchema = z.object({ version: z.literal(1), drafts: z.array(legacyDraftSchema).max(3) })
 type LegacyDraftRecord = { id: string; text: string; createdAt: number }
+
+const budgetRecordSchema = z.object({
+  version: z.literal(1),
+  // Unlimited mode can admit more than the largest configurable finite limit.
+  calls: z.array(z.number().int().nonnegative()),
+})
+type BudgetRecord = z.infer<typeof budgetRecordSchema>
 
 export function createDomainSpec(initial: AssistantConfig) {
   return defineDomain({
@@ -20,6 +28,44 @@ export function createDomainSpec(initial: AssistantConfig) {
 }
 
 export type AssistantDomain = Domain<ReturnType<typeof createDomainSpec>>
+
+/**
+ * Keep the settings format unchanged. JSON's per-record layout silently skips
+ * unreadable/foreign documents; the single layout reports those failures.
+ */
+export function createBudgetDomainSpec() {
+  return defineDomain({
+    name: 'input_assistant_budget', version: 1, layout: 'single',
+    tables: { budget: domainTable<string, BudgetRecord>(budgetRecordSchema) },
+  })
+}
+
+export type BudgetDomain = Domain<ReturnType<typeof createBudgetDomainSpec>>
+
+/** One queue owns read/check/write; failed writes leave the domain unchanged. */
+export class AutomaticCallBudget {
+  private chain: Promise<void> = Promise.resolve()
+  constructor(private readonly domain: () => Promise<BudgetDomain>) {}
+
+  allow(limit: number, signal: AbortSignal): Promise<boolean> {
+    const task = this.chain.then(async () => {
+      signal.throwIfAborted()
+      const domain = await this.domain()
+      signal.throwIfAborted()
+      const table = domain.table('budget')
+      const budget = new CallBudget()
+      const now = Date.now()
+      budget.hydrate({ global: table.get('global')?.calls ?? [] }, now)
+      if (!budget.allow('global', limit, now)) return false
+      // put is an upsert. Its Promise resolves only after backend durability,
+      // for both first-time and existing records. Never start the model earlier.
+      await table.put('global', { version: 1, calls: budget.snapshot(now).global ?? [] })
+      return true
+    })
+    this.chain = task.then(() => undefined, () => undefined)
+    return task
+  }
+}
 
 /** Serializes read-modify-write operations, including the very first save. */
 export class AssistantStorage {

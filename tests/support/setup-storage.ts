@@ -1,17 +1,28 @@
-class MemoryStorage implements Storage {
-  #data = new Map<string, string>()
-  get length(): number { return this.#data.size }
-  clear(): void { this.#data.clear() }
-  getItem(key: string): string | null { return this.#data.get(key) ?? null }
-  key(index: number): string | null { return [...this.#data.keys()][index] ?? null }
-  removeItem(key: string): void { this.#data.delete(key) }
-  setItem(key: string, value: string): void { this.#data.set(key, String(value)) }
-}
+import { afterAll } from 'vitest'
 
-if (typeof globalThis.localStorage === 'undefined') {
-  Object.defineProperty(globalThis, 'localStorage', {
-    value: new MemoryStorage(),
-    configurable: true,
-    writable: true,
+// Vitest exposes the active JSDOM instance after initializing the environment.
+// Node's own storage globals can prevent Vitest 3 from copying these properties.
+const { jsdom } = globalThis as typeof globalThis & { jsdom?: { window: Window } }
+
+// VM pools already run directly in the jsdom window; do not replace its getters.
+if (jsdom && jsdom.window !== globalThis.window) {
+  const storageNames = ['localStorage', 'sessionStorage'] as const
+  const originals = storageNames.map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const)
+
+  for (const name of storageNames) {
+    Object.defineProperty(globalThis, name, {
+      get: () => jsdom.window[name],
+      configurable: true,
+      enumerable: true,
+    })
+  }
+
+  // Vitest does not restore globals that its environment skipped. Restore them
+  // here too, so this setup is safe when files share a worker (--no-isolate).
+  afterAll(() => {
+    for (const [name, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor)
+      else Reflect.deleteProperty(globalThis, name)
+    }
   })
 }

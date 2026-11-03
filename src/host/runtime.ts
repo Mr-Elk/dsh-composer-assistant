@@ -141,8 +141,13 @@ export class AssistantHostRuntime {
     // optimize click should never be silently dropped. 0 means unlimited.
     // One global budget: the UI promises "per hour", not "per session".
     // Manual optimize and "换一条" are explicit user actions and never counted.
-    if (request.operation !== 'optimize' && !request.regenerate
-      && !this.budget.allow('global', settings.hourlyCallLimit)) return this.result(request, null)
+    if (request.operation !== 'optimize' && !request.regenerate) {
+      // Restore the persisted window before deciding, otherwise a restart would
+      // hand the user a fresh allowance and the limit would not guard spending.
+      await this.hydrateBudget()
+      if (!this.budget.allow('global', settings.hourlyCallLimit)) return this.result(request, null)
+      this.saveBudget()
+    }
     const fallback = this.sessionRoute(session)
     const provider = settings.provider || request.provider || fallback?.provider
     const model = settings.model || request.model || fallback?.model
@@ -184,8 +189,30 @@ export class AssistantHostRuntime {
   changed(session: Session): void { this.scheduler.cancel(session.id) }
   dispose(): void { this.disposed = true; this.scheduler.dispose() }
 
-  /** Sliding-window counter for automatic auxiliary calls; the limit comes from settings. */
+  /**
+   * Sliding-window counter for automatic auxiliary calls. Persisted per key so
+   * `hourlyCallLimit` survives a DSH restart; before that it reset silently on
+   * every launch, which made the documented guardrail easy to bypass.
+   */
   private readonly budget = new CallBudget()
+  private budgetHydrated = false
+
+  /** Load persisted timestamps once, before the first budget decision. */
+  private async hydrateBudget(): Promise<void> {
+    if (this.budgetHydrated) return
+    this.budgetHydrated = true
+    try {
+      this.budget.hydrate({ global: await this.storage.budget('global') })
+    } catch {
+      // A missing or unreadable record must not block suggestions; the counter
+      // starts empty and the next admitted call rewrites it.
+    }
+  }
+
+  /** Persist the current window; failures never reject a user-visible request. */
+  private saveBudget(): void {
+    void this.storage.saveBudget('global', this.budget.snapshot().global ?? []).catch(() => undefined)
+  }
 
   async invoke(payload: RpcPayload, signal: AbortSignal): Promise<unknown> {
     signal.throwIfAborted()

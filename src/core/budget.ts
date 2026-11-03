@@ -23,4 +23,25 @@ export class CallBudget {
     if (key === undefined) this.log.clear()
     else this.log.delete(key)
   }
+
+  /** Restores persisted timestamps, dropping anything outside the current window. */
+  hydrate(state: Record<string, readonly number[]>, now = Date.now()): void {
+    const cutoff = now - this.windowMs
+    this.log.clear()
+    for (const [key, times] of Object.entries(state)) {
+      const recent = times.filter(at => Number.isFinite(at) && at > cutoff)
+      if (recent.length) this.log.set(key, [...recent])
+    }
+  }
+
+  /** Persistable snapshot, pruned to the current window. */
+  snapshot(now = Date.now()): Record<string, number[]> {
+    const cutoff = now - this.windowMs
+    const out: Record<string, number[]> = {}
+    for (const [key, times] of this.log) {
+      const recent = times.filter(at => at > cutoff)
+      if (recent.length) out[key] = [...recent]
+    }
+    return out
+  }
 }

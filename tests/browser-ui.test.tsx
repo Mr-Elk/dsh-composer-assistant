@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { useSyncExternalStore, type ComponentProps } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AssistantOverlay, AssistantRight, ghostOverflows } from '../src/browser/components'
 import { BrowserRuntime, type ConnectionFace } from '../src/browser/runtime'
 import { DEFAULT_CONFIG, type AssistantStatus, type GenerationRequest, type TokenSpan } from '../src/core/types'
 import type { BrowserInput } from '../src/browser/controller'
 
+// With --no-isolate, the cached library screen can refer to a previous jsdom body.
+const screen = within(document.body)
 const runtimes: BrowserRuntime[] = []
 afterEach(() => { cleanup(); runtimes.splice(0).forEach(runtime => runtime.dispose()); document.body.innerHTML = ''; localStorage.clear() })
 
@@ -78,6 +80,12 @@ function uiFixture(text: string, mode: 'ghost' | 'panel' = 'panel', suggestions 
 }
 
 describe('composed browser surfaces', () => {
+  it('queries the active document when test files share a worker', () => {
+    const result = render(<button>当前输入区测试文档</button>)
+    expect(screen.getByRole('button', { name: '当前输入区测试文档' }))
+      .toBe(result.getByRole('button', { name: '当前输入区测试文档' }))
+  })
+
   it('shows the first-run hint once, without stealing focus, and remembers dismissal', async () => {
     localStorage.clear()
     const f = uiFixture('原稿')

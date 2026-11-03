@@ -5,8 +5,8 @@ import { Session, type SessionId } from '@deepseek-ai/dsh-session'
 import { BlockAssembler, type GenerateOptions } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-typert-registry'
-import { AssistantError, CallBudget, SessionScheduler, prepareGeneration, finishGeneration, type AssistantConfig, type AssistantStatus, type GenerationRequest, type GenerationResult, type ModelRoute, type ModelCatalog, type ModelOption } from '../core/index'
-import { AssistantStorage } from './storage'
+import { AssistantError, SessionScheduler, prepareGeneration, finishGeneration, type AssistantConfig, type AssistantStatus, type GenerationRequest, type GenerationResult, type ModelRoute, type ModelCatalog, type ModelOption } from '../core/index'
+import { AssistantStorage, AutomaticCallBudget } from './storage'
 import { emptyTranscript } from './transcript'
 import type { RpcPayload } from './rpc'
 
@@ -29,7 +29,8 @@ export class AssistantHostRuntime {
   private readonly instances = new WeakMap<Session, SessionRuntime>()
   private readonly scheduler = new SessionScheduler()
   private disposed = false
-  constructor(private readonly ctx: Context, private readonly storage: AssistantStorage) {}
+  constructor(private readonly ctx: Context, private readonly storage: AssistantStorage,
+    private readonly budget: AutomaticCallBudget) {}
 
   private state(session: Session): SessionRuntime {
     let state = this.instances.get(session)
@@ -137,23 +138,20 @@ export class AssistantHostRuntime {
       if (!request.regenerate && now - state.lastCompletionAt < settings.minIntervalMs) return this.result(request, null)
       state.lastCompletionAt = now
     }
-    // User-configured budget applies to automatic suggestions only: a manual
-    // optimize click should never be silently dropped. 0 means unlimited.
-    // One global budget: the UI promises "per hour", not "per session".
-    // Manual optimize and "换一条" are explicit user actions and never counted.
-    if (request.operation !== 'optimize' && !request.regenerate) {
-      // Restore the persisted window before deciding, otherwise a restart would
-      // hand the user a fresh allowance and the limit would not guard spending.
-      await this.hydrateBudget()
-      if (!this.budget.allow('global', settings.hourlyCallLimit)) return this.result(request, null)
-      this.saveBudget()
-    }
     const fallback = this.sessionRoute(session)
     const provider = settings.provider || request.provider || fallback?.provider
     const model = settings.model || request.model || fallback?.model
     if (!provider || !model) throw new AssistantError('MODEL', '请先在 DSH 输入框选择可用模型，或在输入助手设置辅助模型')
     const prepared = prepareGeneration(request, transcript.entries, settings)
     const text = await this.scheduler.run(request.sessionId, request.requestId, request.operation, prepared.timeoutMs, async active => {
+      // Automatic suggestions share one durable rolling-hour budget. Manual
+      // optimize and explicit regenerate are exempt. Include storage waits in
+      // cancellation/timeout handling, and recheck before reaching the model.
+      if (request.operation !== 'optimize' && !request.regenerate) {
+        if (!await this.budget.allow(settings.hourlyCallLimit, active)) return null
+        active.throwIfAborted()
+        this.current(request, session)
+      }
       const call = await this.ctx.llm.prepareCall({ provider, model, maxTokens: prepared.maxOutputTokens, temperature: settings.temperature }, active, (controls, info) => {
         // Auxiliary text tasks always take the adapter's lowest advertised effort
         // rather than inheriting a costly conversation default or assuming every
@@ -188,31 +186,6 @@ export class AssistantHostRuntime {
   cancel(id: string, requestId?: string): boolean { return this.scheduler.cancel(id, requestId) }
   changed(session: Session): void { this.scheduler.cancel(session.id) }
   dispose(): void { this.disposed = true; this.scheduler.dispose() }
-
-  /**
-   * Sliding-window counter for automatic auxiliary calls. Persisted per key so
-   * `hourlyCallLimit` survives a DSH restart; before that it reset silently on
-   * every launch, which made the documented guardrail easy to bypass.
-   */
-  private readonly budget = new CallBudget()
-  private budgetHydrated = false
-
-  /** Load persisted timestamps once, before the first budget decision. */
-  private async hydrateBudget(): Promise<void> {
-    if (this.budgetHydrated) return
-    this.budgetHydrated = true
-    try {
-      this.budget.hydrate({ global: await this.storage.budget('global') })
-    } catch {
-      // A missing or unreadable record must not block suggestions; the counter
-      // starts empty and the next admitted call rewrites it.
-    }
-  }
-
-  /** Persist the current window; failures never reject a user-visible request. */
-  private saveBudget(): void {
-    void this.storage.saveBudget('global', this.budget.snapshot().global ?? []).catch(() => undefined)
-  }
 
   async invoke(payload: RpcPayload, signal: AbortSignal): Promise<unknown> {
     signal.throwIfAborted()

@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import { AssistantError, DEFAULT_CONFIG, resolveConfig, type AssistantConfig } from './core/index'
 import { AssistantHostRuntime } from './host/runtime'
-import { AssistantStorage, createDomainSpec, type AssistantDomain } from './host/storage'
+import { AssistantStorage, AutomaticCallBudget, createDomainSpec, createBudgetDomainSpec, type AssistantDomain, type BudgetDomain } from './host/storage'
 import { emptyTranscript, foldTranscript, transcriptSchema } from './host/transcript'
 import { hostContribution, rpcPayloadSchema, type RpcPayload } from './host/rpc'
 
@@ -62,8 +62,18 @@ export class InputAssistantService extends TypertRemoteService {
 export function apply(ctx: Context, config: Config = {}): void {
   const initial = resolveConfig({ ...DEFAULT_CONFIG, ...config })
   let opened: Promise<AssistantDomain> | undefined
-  const domain = (): Promise<AssistantDomain> => opened ??= ctx.storageDomain.open(createDomainSpec(initial))
-  const runtime = new AssistantHostRuntime(ctx, new AssistantStorage(domain))
+  let openedBudget: Promise<BudgetDomain> | undefined
+  // Every concurrent caller shares one complete open. A failed open is retried
+  // on the next operation, rather than caching a rejected Promise forever.
+  const domain = (): Promise<AssistantDomain> => opened ??= ctx.storageDomain.open(createDomainSpec(initial)).catch(error => {
+    opened = undefined
+    throw error
+  })
+  const budgetDomain = (): Promise<BudgetDomain> => openedBudget ??= ctx.storageDomain.open(createBudgetDomainSpec()).catch(error => {
+    openedBudget = undefined
+    throw error
+  })
+  const runtime = new AssistantHostRuntime(ctx, new AssistantStorage(domain), new AutomaticCallBudget(budgetDomain))
   ctx.sessionProjections.register({
     key: 'inputAssistantTranscript', stateSchema: transcriptSchema, init: emptyTranscript,
     apply: foldTranscript, stateVersion: 1,
@@ -77,5 +87,6 @@ export function apply(ctx: Context, config: Config = {}): void {
   ctx.effect(() => async () => {
     runtime.dispose()
     if (opened) { try { await (await opened).close() } catch { /* The storage owner may already have disposed. */ } }
+    if (openedBudget) { try { await (await openedBudget).close() } catch { /* The storage owner may already have disposed. */ } }
   })
 }

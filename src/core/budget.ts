@@ -1,4 +1,4 @@
-/** Sliding-window limit for auxiliary model calls, keyed by session. */
+/** Sliding-window limit for auxiliary model calls, keyed by budget scope. */
 export class CallBudget {
   private readonly log = new Map<string, number[]>()
   constructor(private readonly windowMs = 3_600_000) {}

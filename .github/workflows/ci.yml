@@ -21,6 +21,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm test --no-isolate --maxWorkers=1
       - run: pnpm build
       - run: pnpm pack --pack-destination dist
       - run: pnpm test:package
@@ -49,4 +50,5 @@ jobs:
       - run: pnpm build
       - run: pnpm pack --pack-destination dist
       - run: pnpm test
+      - run: pnpm test --no-isolate --maxWorkers=1
       - run: pnpm test:package

@@ -27,7 +27,8 @@ jobs:
 
   linux:
     name: Linux / Node ${{ matrix.node }} / Chrome
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 supports Ubuntu 24.04, but not the newer latest image.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:

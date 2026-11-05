@@ -192,11 +192,11 @@ Edge 夹具使用生产输入助手界面和控制器、真实 Lexical 编辑器
 
 目标：额度重启保留、流式灰字、请求统计、术语保护各走一遍。
 
-环境：DSH Desktop `0.2.2-rc.1`，`desktop` profile。该 profile 当前安装的是 2026-11-02 的较早 0.4.0 构建，不是 `release/0.4.0` 的新构建；安装新构建需要写入 profile 并重启桌面端，本轮没有执行，以免中断当前 DSH 会话。
+环境：DSH Desktop `0.2.2-rc.1`，`desktop` profile。已把 `release/0.4.0` 构建安装到该 profile，旧包备份在 `/tmp/dsh-composer-desktop-backup-20261105.tgz`；桌面端尚未重启，等待 macOS 辅助功能授权。
 
 实际尝试：
 
-- 已能读取桌面窗口截图并定位 composer 和设置入口。
+- 已把新 0.4.0 包装入 `desktop` profile，并保留旧包备份；已能读取桌面窗口截图并定位 composer 和设置入口。
 - 用 `CGWarpMouseCursorPosition` 和 `CGEvent` 发送点击、键盘输入；`AXIsProcessTrusted()` 为 `false`，系统忽略合成输入，无法确认按钮点击或输入草稿。
 - 尝试复制 DSH Desktop.app 启动隔离实例：原 app 的单实例锁阻止第二个实例；复制后的 app 被 Gatekeeper 拒绝并在启动时崩溃。
 - 没有读取或修改用户凭据。一次只读 Keychain 查询被系统拒绝，触发的系统对话框已关闭。

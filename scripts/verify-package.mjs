@@ -23,7 +23,7 @@ for (let offset = 0; offset + 512 <= tar.length;) {
   entries.set(name, tar.subarray(offset + 512, offset + 512 + size))
   offset += 512 + Math.ceil(size / 512) * 512
 }
-for (const path of ['package/package.json', 'package/cordis.patch.yml', 'package/lib/index.js', 'package/lib/index.d.ts', 'package/lib/client.js', 'package/lib/core.js', 'package/README.md', 'package/LICENSE']) assert.ok(entries.has(path), `Missing ${path}`)
+for (const path of ['package/package.json', 'package/cordis.patch.yml', 'package/lib/index.js', 'package/lib/index.d.ts', 'package/lib/client.js', 'package/lib/core.js', 'package/README.md', 'package/README.en.md', 'package/LICENSE']) assert.ok(entries.has(path), `Missing ${path}`)
 assert.ok(![...entries.keys()].some(path => /node_modules|\.research|evaluation\/cases/.test(path)), 'Research/runtime/evaluation fixtures must not ship')
 
 const pkg = JSON.parse(entries.get('package/package.json').toString('utf8'))

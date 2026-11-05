@@ -129,3 +129,24 @@ Edge 夹具使用生产输入助手界面和控制器、真实 Lexical 编辑器
 全套测试第一次运行时，本地浏览器测试服务被执行环境拒绝（`listen EPERM`），不能算通过；在允许本地服务的环境重跑后通过。安装包测试在构建打包后补跑通过，未把跳过项记成通过。
 
 尚未验证：DSH 桌面完整退出、重启后的真实模型调用；其他存储后端；断电或文件系统/硬件损坏。预算不是账户账单上限：手动优化、显式“换一条”和主对话不计入；初次升级无法补记旧调用；删除数据、换配置、退回旧版本或多个独立进程同时写同一存储不受此保证。窗口依赖本机时间；已保存的预留即使未获得建议也不退款。
+
+## 2026-11-05：PR #1 与当前 main 的整合验证
+
+对象：[PR #1](https://github.com/Mr-Elk/dsh-composer-assistant/pull/1)，提交 `affaafa`，原始基线 `3dd4a78`；目标 `origin/main` 提交 `8046c77`（已含 PR #4、#2、#5）。在本地试合并时只有两个冲突：`README.md` 和 `tests/browser-settings.test.tsx`；`package.json`、`scripts/verify-package.mjs` 与 `scripts/verify-publish.mjs` 自动合并。
+
+处理方式：中文 README 保留 PR #1 的安装、升级、回滚和未保存设置说明，并合入 PR #4 的跨重启滚动 60 分钟额度、先预留后调用、存储失败保护和适用范围；英文 README 同步相同行为与限制；设置回归测试同时保留 PR #5 的当前文档查询用例和 PR #1 的未保存设置恢复用例。没有修改预算、存储和测试隔离实现，也没有发布 npm 包。
+
+执行环境：macOS、Node.js 22.23.2、pnpm 11.28.5、Google Chrome 156.0.8078.80。工作区位于 exFAT 卷，pnpm 无法就地建立 store，因此把源码复制到 APFS 临时目录执行；以下结果来自该副本的合并后源码。
+
+| 实际命令 | 结果 |
+| --- | --- |
+| `pnpm typecheck` | 通过 |
+| `pnpm test` | 20 个测试文件，193 条全部通过；含 5 条使用本机 Chrome 的浏览器主题测试 |
+| `pnpm test --no-isolate --maxWorkers=1` | 20 个测试文件，193 条全部通过 |
+| `pnpm build` | 通过 |
+| `pnpm pack --pack-destination dist` | 生成本地 `dsh-composer-assistant-0.3.0.tgz`；未发布 |
+| `pnpm test:package` | 通过；压缩包包含 `README.md`、`README.en.md`、客户端入口和宿主入口 |
+| `pnpm publish:check` | 通过；版本与 `lib/` 一致 |
+| `git diff --check` | 通过 |
+
+尚未验证：DSH Desktop 完整退出并重启后的真实模型调用；真实 Edge 窗口；真实中文输入法；本机只有 Node.js 22，Node.js 24/26 由仓库 CI 覆盖。额度行为只通过 `tests/host-budget.test.ts` 的真实插件、官方 JSON 存储和独立 Node 进程重开验证，不能替代桌面端实机验收。

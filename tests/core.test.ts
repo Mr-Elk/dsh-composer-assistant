@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DEFAULT_CONFIG, resolveConfig, protectText, restoreProtected, prepareGeneration, finishGeneration, NO_SUGGESTION, buildContext, charCount, snapshotMatches, diffText, SessionScheduler, CallBudget, type GenerationRequest } from '../src/core'
+import { DEFAULT_CONFIG, resolveConfig, protectText, restoreProtected, parsePreserveTerms, prepareGeneration, finishGeneration, NO_SUGGESTION, buildContext, charCount, snapshotMatches, diffText, SessionScheduler, CallBudget, type GenerationRequest } from '../src/core'
 
 const request = (extra: Partial<GenerationRequest> = {}): GenerationRequest => ({
   operation: 'optimize', requestId: 'r1', sessionId: 's1', sourceTurnId: 'turn1',
@@ -20,6 +20,19 @@ describe('literal protection and prompt construction', () => {
     expect(() => restoreProtected(output, p)).toThrow(/锁定/)
   })
   it('rejects a manual lock that no longer exists', () => expect(() => protectText('new draft', ['old'])).toThrow(/已变化/))
+  it('keeps glossary terms verbatim and ignores terms missing from the draft', () => {
+    const config = resolveConfig({ preserveTerms: 'DSH，lint\nDSH' })
+    const draft = '把 DSH 的 lint 规则说清楚'
+    const prepared = prepareGeneration(request({ draft, targetText: draft }), [], config)
+    expect(prepared.protection?.fragments.map(fragment => fragment.original)).toEqual(['DSH', 'lint'])
+    expect(restoreProtected(prepared.protection!.masked, prepared.protection!)).toBe(draft)
+    expect(() => prepareGeneration(request({ draft: '普通草稿', targetText: '普通草稿' }), [], config)).not.toThrow()
+  })
+  it('caps the glossary at twenty unique terms and a 1000-character field', () => {
+    expect(parsePreserveTerms(Array.from({ length: 30 }, (_, index) => `术语${index}`).join('\n'))).toHaveLength(20)
+    expect(parsePreserveTerms('a, a、b；b')).toEqual(['a', 'b'])
+    expect(() => resolveConfig({ preserveTerms: 'x'.repeat(1001) })).toThrow()
+  })
   it('protects Unicode relative and POSIX paths without consuming following Chinese punctuation', () => {
     const original = '查看 ./项目/配置.json，比较 /项目/src/入口.ts。另看 ..\\代码\\main.ts。'
     const protectedText = protectText(original)

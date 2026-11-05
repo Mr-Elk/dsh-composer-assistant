@@ -36,6 +36,8 @@ class TestAdapter extends LlmAdapter {
   output = '请解释这次修改的原因'
   paused: Promise<void> | null = null
   entered: (() => void) | null = null
+  segments: string[] | null = null
+  between: Promise<void> | null = null
   async resolveModel(provider: string, id: string): Promise<LlmResolvedModelInfo> {
     return { provider, id, name: 'Local fixture', reasoning: { efforts: [
       { id: ReasoningEffortId('fixture-low'), name: 'Low' }, { id: ReasoningEffortId('fixture-high'), name: 'High' },
@@ -48,7 +50,11 @@ class TestAdapter extends LlmAdapter {
     this.requests.push(options)
     this.entered?.()
     if (this.paused) await this.paused
-    yield { type: 'text-delta', index: 0, text: this.output }
+    const parts = this.segments ?? [this.output]
+    for (let index = 0; index < parts.length; index++) {
+      if (index === 1 && this.between) await this.between
+      yield { type: 'text-delta', index: 0, text: parts[index] }
+    }
     yield { type: 'finish', reason: { kind: 'stop' } }
   }
 }
@@ -67,7 +73,7 @@ async function fixture() {
   llm.registerAdapter(['fixture'], adapter)
   const gateway = new TypertGatewayService(ctx, {})
   const peer = new Peer(ctx, { principal: { kind: 'owner' } })
-  const fiber = ctx.plugin(plugin, {})
+  const fiber = ctx.plugin(plugin, { nextEnabled: true, completionEnabled: true })
   await fiber.await()
   const session = ctx.sessions.create(SessionId('test-session'))
   const call = async <T>(method: string, data: unknown): Promise<T> => await gateway.invoke({
@@ -139,6 +145,28 @@ describe('real DSH Gateway / projection / LLM composition', () => {
     await rejection
     release()
     expect((await f.call<AssistantStatus>('status', { sessionId: f.session.id })).sourceTurnId).toBeNull()
+  })
+
+  it('serves streamed partials to polling readers and clears them when the request settles', async () => {
+    const f = await fixture()
+    complete(f.session, 1)
+    const status = await f.call<AssistantStatus>('status', { sessionId: f.session.id })
+    f.adapter.segments = ['前半', '后半']
+    let release!: () => void
+    f.adapter.between = new Promise<void>(resolve => { release = resolve })
+    const pending = f.call<GenerationResult>('generate', generation(status, { requestId: 'stream-1' }))
+    let partial: { text: string } | null = null
+    for (let attempt = 0; attempt < 50 && !partial; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 5))
+      partial = await f.call<{ text: string } | null>('generate/partial', { sessionId: f.session.id, requestId: 'stream-1' })
+    }
+    expect(partial?.text).toBe('前半')
+    // A reader from another session never sees this request.
+    expect(await f.call('generate/partial', { sessionId: 'other-session', requestId: 'stream-1' })).toBeNull()
+    release()
+    const result = await pending
+    expect(result.text).toBe('前半后半')
+    expect(await f.call('generate/partial', { sessionId: f.session.id, requestId: 'stream-1' })).toBeNull()
   })
 
   it('abstains from a queued first-draft completion after turn/start but permits an idle first draft', async () => {

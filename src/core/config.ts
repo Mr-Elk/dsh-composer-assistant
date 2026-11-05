@@ -6,7 +6,7 @@ const numeric: Record<string, [number, number]> = {
   optimizeTimeoutMs: [1000, 120000], suggestionTimeoutMs: [1000, 60000], hourlyCallLimit: [0, 2000],
 }
 const booleans = ['optimizeEnabled', 'nextEnabled', 'completionEnabled'] as const
-const strings = ['provider', 'model', 'extraInstruction'] as const
+const strings = ['provider', 'model', 'extraInstruction', 'preserveTerms'] as const
 /** Keys removed in 0.3.0 that may still arrive from an older running host. */
 const LEGACY_KEYS = new Set(['stashEnabled', 'nextTrigger'])
 
@@ -39,7 +39,7 @@ function validate(config: AssistantConfig): AssistantConfig {
     }
   }
   for (const key of strings) {
-    const limit = key === 'extraInstruction' ? 500 : 200
+    const limit = key === 'extraInstruction' ? 500 : key === 'preserveTerms' ? 1000 : 200
     if (typeof config[key] !== 'string' || config[key].length > limit) throw new AssistantError('CONFIG_STRING', `${key} 无效`, { field: key, limit })
     config[key] = config[key].trim()
   }

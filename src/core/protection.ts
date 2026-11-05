@@ -1,4 +1,19 @@
 import { AssistantError } from './types'
+/** User glossary limits; kept small so protection stays fast and predictable. */
+export const PRESERVE_TERMS_MAX = 20
+
+/** Split a free-text glossary into unique terms; separators mirror common Chinese/English lists. */
+export function parsePreserveTerms(raw: string): string[] {
+  if (!raw) return []
+  const seen = new Set<string>()
+  for (const part of raw.split(/[\n,，、;；]+/)) {
+    const term = part.trim()
+    if (term) seen.add(term)
+    if (seen.size >= PRESERVE_TERMS_MAX) break
+  }
+  return [...seen]
+}
+
 export interface ProtectedFragment { token: string; original: string }
 export interface ProtectedText { original: string; masked: string; fragments: ProtectedFragment[] }
 

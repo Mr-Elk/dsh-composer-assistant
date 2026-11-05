@@ -1,6 +1,6 @@
 # 验收记录
 
-> 本文是 0.1.x 的历史验收记录。草稿暂存已在 0.2.0 移除；文中相关段落只作历史证据。
+> 最新记录见文末「2026-11-05：DSH-only 0.4.0 分支整理与发布校验」。前半部分保留 0.1.x 历史验收；草稿暂存已在 0.2.0 移除，相关段落只作历史证据。
 
 此文件记录实际执行证据，不把发布接口核对、模拟模型测试或参考答案当作真实模型验收。
 
@@ -130,23 +130,60 @@ Edge 夹具使用生产输入助手界面和控制器、真实 Lexical 编辑器
 
 尚未验证：DSH 桌面完整退出、重启后的真实模型调用；其他存储后端；断电或文件系统/硬件损坏。预算不是账户账单上限：手动优化、显式“换一条”和主对话不计入；初次升级无法补记旧调用；删除数据、换配置、退回旧版本或多个独立进程同时写同一存储不受此保证。窗口依赖本机时间；已保存的预留即使未获得建议也不退款。
 
-## 2026-11-05：PR #1 与当前 main 的整合验证
+## 2026-11-04：0.4.0 本地整合、默认费用保护与说明修正
 
-对象：[PR #1](https://github.com/Mr-Elk/dsh-composer-assistant/pull/1)，提交 `affaafa`，原始基线 `3dd4a78`；目标 `origin/main` 提交 `8046c77`（已含 PR #4、#2、#5）。在本地试合并时只有两个冲突：`README.md` 和 `tests/browser-settings.test.tsx`；`package.json`、`scripts/verify-package.mjs` 与 `scripts/verify-publish.mjs` 自动合并。
+本轮只修改和验证本地版本，未提交、推送、发布或安装到正在使用的 DSH。版本保持待发布的 `0.4.0`。
 
-处理方式：中文 README 保留 PR #1 的安装、升级、回滚和未保存设置说明，并合入 PR #4 的跨重启滚动 60 分钟额度、先预留后调用、存储失败保护和适用范围；英文 README 同步相同行为与限制；设置回归测试同时保留 PR #5 的当前文档查询用例和 PR #1 的未保存设置恢复用例。没有修改预算、存储和测试隔离实现，也没有发布 npm 包。
+### 改动与范围
 
-执行环境：macOS、Node.js 22.23.2、pnpm 11.28.5、Google Chrome 156.0.8078.80。工作区位于 exFAT 卷，pnpm 无法就地建立 store，因此把源码复制到 APFS 临时目录执行；以下结果来自该副本的合并后源码。
+- 以本地 `41efb17` 和远端 `8046c77` 为输入，将 PR #4 的预算存储及 PR #2、#5 的测试环境修复整合到工作文件。保留本地流式建议、请求统计、术语保护及原有编辑器替换/IME 修复。整合以未提交文件保存，Git 分支和提交历史未移动。
+- `src/core/types.ts` 与入口 schema 同时采用新默认值：手动优化开，回复后预测和输入续写关，自动建议每小时限 10 次。存储仍宽松读取；升级保留已有选择，包括 0（不限）。非法开关和额度回落到新默认值。
+- `src/core/i18n.ts`、`src/browser/usage.ts`、README 和设置规格说明费用与数据去向。跟随模型也会额外调用；草稿及所需上下文经 DSH 发给所选服务。手动优化和“换一条”不受自动额度限制，仍可能收费。
+- 界面及复制结果使用“请求次数”，明确包含失败、取消和被额度拦截的生成请求，不代表实际模型调用或账单；保留原有采纳与编辑统计。改写提示词的要求不再表述为模型行为的绝对保证。
+- DSH 默认类型检查和测试只覆盖主插件；其他试验线不进入本分支或 DSH 发布包。
+- `scripts/local-dev.sh` 每次按锁文件准备依赖，先构建、打包再测，避免用旧安装包验收；只回写本次版本的包。`scripts/verify-package.mjs` 比较包内文件与本次构建，并从实际包内检查核心默认值及入口 schema，拒绝旧的同版本包。
+
+### 实际执行
+
+环境为 macOS、Node 22.23.2、pnpm 11.28.5。因源码盘为 exFAT，在独立 APFS 临时目录按锁文件安装依赖并检查；源码和临时构建副本逐文件核对，本地安装包保存回项目 `dist/`。所有检查均未配置付费模型。
 
 | 实际命令 | 结果 |
 | --- | --- |
+| `DSH_IA_BUILD=<本轮独立目录> ./scripts/local-dev.sh` | 依赖、TypeScript、构建、打包、主插件测试及安装包校验通过；21 个测试文件、209 条全部通过，无跳过 |
+| `node node_modules/vitest/vitest.mjs run --no-isolate --maxWorkers=1` | 同一进程运行，209/209 通过 |
+| `node scripts/smoke-web.mjs` | 13 项浏览器编辑器检查通过，0 次付费调用；首次提示、采纳、撤销、保护、候选卡及窄窗/200% 等效宽度通过 |
+| `node node_modules/vitest/vitest.mjs run tests/host-storage.test.ts` | 补充非法开关/额度回退断言后，8/8 通过 |
+| `pnpm pack --pack-destination dist` | 重新生成本地 0.4.0 包；未发布 |
+| `node scripts/verify-package.mjs` | 实际包内版本、当前构建文件、宿主/核心导入、客户端工厂及默认关闭/10 次额度通过 |
+| `node scripts/verify-package.mjs <本轮备份的旧 0.4.0 包>` | 按预期拒绝，报告 `Packed file differs from this build: lib/client.js` |
+| `node scripts/verify-publish.mjs` | 只读发布前检查通过；没有执行发布 |
+| `sh -n scripts/local-dev.sh`、`node --check scripts/verify-package.mjs`、`git diff --check` | 通过 |
+
+主插件的 21 项预算测试使用真实插件、官方 Gateway、Session、文件存储和独立 Node 进程，覆盖默认不自动调用、手动优化仍可进入模型准备、用户主动开启、已有配置重开保留、并发额度、重启保留、到期释放、真实读写失败、取消和超时。未配置提供商，获准请求到达真实 LLM 运行时后在本地结束，不产生付费模型调用。浏览器检查使用现有编辑器测试环境，不等同于真实 DSH 桌面操作。
+
+### 未运行与限制
+
+- 未安装到真实 DSH，未重新验证桌面完整退出/重启及真实输入法、`@` 菜单组合；没有把文件存储的进程重开测试说成桌面实测。
+- 未新增真实模型质量评测；60 条固定集合仍是 `not_evaluated`（0/60），本轮不作效果或竞品排名结论。
+- 新默认值不会自动替已有用户关闭功能或重设额度。当前使用中的 DSH 插件也不会因本轮源码改动自动更新。
+
+## 2026-11-05：DSH-only 0.4.0 分支整理与发布校验
+
+从 `origin/main` 的 `8f7a650` 新建 `release/0.4.0`，只带入 DSH 插件的流式建议、请求统计、术语保护和默认费用保护；版本为 `0.4.0`。本分支只包含 DSH 插件，不包含其他试验线；旧的工作树保留未动。
+
+执行环境：macOS、Node.js 22.23.2、pnpm 11.28.5、Google Chrome 156.0.8078.80。工作区位于 exFAT 卷，pnpm 无法就地建立 store，因此把源码复制到 APFS 临时目录执行；以下结果来自该副本的 0.4.0 源码。
+
+| 实际命令 | 结果 |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | 通过 |
 | `pnpm typecheck` | 通过 |
-| `pnpm test` | 20 个测试文件，193 条全部通过；含 5 条使用本机 Chrome 的浏览器主题测试 |
-| `pnpm test --no-isolate --maxWorkers=1` | 20 个测试文件，193 条全部通过 |
+| `pnpm test`（打包后） | 21 个测试文件，210 条全部通过；含 5 条使用本机 Chrome 的浏览器主题测试 |
+| `pnpm test --no-isolate --maxWorkers=1` | 21 个测试文件，210 条全部通过 |
 | `pnpm build` | 通过 |
-| `pnpm pack --pack-destination dist` | 生成本地 `dsh-composer-assistant-0.3.0.tgz`；未发布 |
-| `pnpm test:package` | 通过；压缩包包含 `README.md`、`README.en.md`、客户端入口和宿主入口 |
+| `pnpm pack --pack-destination dist` | 生成本地 `dsh-composer-assistant-0.4.0.tgz`；未发布 |
+| `pnpm test:package` | 通过；压缩包包含双语 README、客户端入口和宿主入口，并校验默认关闭/10 次额度 |
 | `pnpm publish:check` | 通过；版本与 `lib/` 一致 |
+| `pnpm test:web` | 13 项浏览器编辑器检查通过，0 次付费调用 |
 | `git diff --check` | 通过 |
 
-尚未验证：DSH Desktop 完整退出并重启后的真实模型调用；真实 Edge 窗口；真实中文输入法；本机只有 Node.js 22，Node.js 24/26 由仓库 CI 覆盖。额度行为只通过 `tests/host-budget.test.ts` 的真实插件、官方 JSON 存储和独立 Node 进程重开验证，不能替代桌面端实机验收。
+尚未验证：DSH Desktop 完整退出并重启后的真实模型调用；真实 Edge 窗口；真实中文输入法。它们仍需在目标 DSH、系统和输入法组合中逐项验收。本轮没有执行 `npm publish`，npm 公开版本仍是 `0.3.0`。

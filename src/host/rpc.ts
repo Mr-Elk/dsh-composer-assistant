@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { createTypertRemoteInfo } from '@deepseek-ai/dsh-typert-protocol/remote-info'
 
 export const rpcPayloadSchema = z.strictObject({
-  method: z.enum(['status', 'generate', 'cancel', 'models/list', 'settings/get', 'settings/set']),
+  method: z.enum(['status', 'generate', 'generate/partial', 'cancel', 'models/list', 'settings/get', 'settings/set']),
   data: z.json(),
 })
 export type RpcPayload = z.infer<typeof rpcPayloadSchema>

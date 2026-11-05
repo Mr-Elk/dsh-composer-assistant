@@ -16,7 +16,7 @@ export const inject = ['llm', 'sessions', 'sessionProjections', 'storageDomain',
 export const Config = schema.object({
   optimizeEnabled: schema.boolean().default(true),
   optimizationStrength: schema.union(['light', 'standard', 'deep']).default('standard'),
-  nextEnabled: schema.boolean().default(true), completionEnabled: schema.boolean().default(true),
+  nextEnabled: schema.boolean().default(DEFAULT_CONFIG.nextEnabled), completionEnabled: schema.boolean().default(DEFAULT_CONFIG.completionEnabled),
   language: schema.union(['follow', 'zh', 'en']).default('follow'),
   displayMode: schema.union(['ghost', 'panel']).default('ghost'),
   debounceMs: schema.natural().min(200).max(5000).default(600),
@@ -27,9 +27,10 @@ export const Config = schema.object({
   optimizeTimeoutMs: schema.natural().min(1000).max(120000).default(60000),
   suggestionTimeoutMs: schema.natural().min(1000).max(60000).default(15000),
   provider: schema.string().default(''), model: schema.string().default(''),
-  hourlyCallLimit: schema.natural().min(0).max(2000).default(0),
+  hourlyCallLimit: schema.natural().min(0).max(2000).default(DEFAULT_CONFIG.hourlyCallLimit),
   temperature: schema.number().min(0).max(2).default(0.7),
   extraInstruction: schema.string().default(''),
+  preserveTerms: schema.string().default(''),
 })
 
 declare module '@deepseek-ai/cordis' { interface Context { inputAssistant: InputAssistantService } }

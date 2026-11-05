@@ -37,6 +37,12 @@ body[data-ds-dark-theme] .dsh-ia {--dsh-ia-fallback-bg:#232324;--dsh-ia-fallback
 .dsh-ia-pop-actions {display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:4px;padding:4px 8px 6px;border-top:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border))}
 .dsh-ia-pop-actions .dsh-ia-muted {margin-right:auto;font-size:12px;color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted))}
 .dsh-ia-pop-actions .dsh-ia-primary {min-height:28px;padding:0 12px}
+.dsh-ia-pop-foot {display:flex;justify-content:flex-start;padding:2px 8px 0}
+.dsh-ia-link {min-height:26px;padding:0 2px;font-size:12px;color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted))}
+.dsh-ia-usage {width:420px}
+.dsh-ia-usage-actions {display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:10px;border-top:1px solid var(--dsw-alias-border-l2,var(--dsh-ia-fallback-border))}
+.dsh-ia-usage-actions>span {font-size:12px;line-height:18px;color:var(--dsw-alias-state-success-primary,#1a7f4b)}
+.dsh-ia-usage-actions .dsh-ia-primary {min-height:28px;padding:0 12px}
 
 .dsh-ia-field {display:flex;flex-direction:column;gap:5px;margin:6px 4px;font-size:12px;color:var(--dsw-alias-label-secondary,var(--dsh-ia-fallback-muted))}
 .dsh-ia-group .dsh-ia-field {margin:0;gap:2px}
@@ -67,6 +73,7 @@ body[data-ds-dark-theme] .dsh-ia {--dsh-ia-fallback-bg:#232324;--dsh-ia-fallback
 .dsh-ia-candidate {position:fixed;display:flex;align-items:center;gap:6px;padding:6px 6px 6px 12px;overflow:auto;border:0;border-radius:16px;background:var(--dsw-alias-bg-layer-2,var(--dsh-ia-fallback-bg));box-shadow:0 0 0 .5px rgba(0,0,0,.04),0 3px 8px rgba(0,0,0,.04),0 0 20px rgba(0,0,0,.05);pointer-events:auto;z-index:998}
 .dsh-ia-candidate-text {flex:1;white-space:pre-wrap;overflow-wrap:anywhere}
 .dsh-ia-ghost {position:fixed;white-space:pre-wrap;overflow-wrap:anywhere;overflow:hidden;pointer-events:none;user-select:none;color:var(--dsw-alias-label-tertiary,#76808d);opacity:.95;z-index:34}
+.dsh-ia-ghost-streaming {opacity:.55}
 .dsh-ia-ghost-key {display:inline-block;margin-left:6px;padding:0 5px;border:1px solid var(--dsw-alias-border-l2,#c9ced6);border-radius:5px;font-size:10px;line-height:14px;vertical-align:1px;color:var(--dsw-alias-label-secondary,#6b7078)}
 [data-composer-card]:has([data-dsh-ia-empty-ghost]) [data-composer-placeholder] {visibility:hidden}
 

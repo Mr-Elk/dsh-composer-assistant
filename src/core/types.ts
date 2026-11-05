@@ -24,14 +24,16 @@ export interface AssistantConfig {
   hourlyCallLimit: number
   temperature: number
   extraInstruction: string
+  /** Newline/comma separated terms that optimization must keep verbatim. */
+  preserveTerms: string
 }
 export const DEFAULT_CONFIG: Readonly<AssistantConfig> = Object.freeze({
   optimizeEnabled: true, optimizationStrength: 'standard',
-  nextEnabled: true, completionEnabled: true, displayMode: 'ghost', language: 'follow',
+  nextEnabled: false, completionEnabled: false, displayMode: 'ghost', language: 'follow',
   debounceMs: 600, minIntervalMs: 2000, maxHistoryChars: 16000,
   maxDraftChars: 8000, suggestionLength: 'standard',
   optimizeTimeoutMs: 60000, suggestionTimeoutMs: 15000, provider: '', model: '',
-  hourlyCallLimit: 0, temperature: 0.7, extraInstruction: '',
+  hourlyCallLimit: 10, temperature: 0.7, extraInstruction: '', preserveTerms: '',
 })
 export interface InputSnapshot {
   requestId: string

@@ -305,6 +305,12 @@ export function AssistantSettings({ runtime }: SettingsProps) {
                 <option value="deep">{tr('settings.select.deep')}</option>
               </select>
             </Row>
+            <label className="dsh-ia-field dsh-ia-field-block">
+              <span className="dsh-ia-field-title">{tr('settings.preserveTerms')} <InfoTip text={tr('settings.hint.preserveTerms')} label={`${tr('common.help')}: ${tr('settings.preserveTerms')}`} /></span>
+              <textarea aria-label={tr('settings.preserveTerms')} value={form.preserveTerms} maxLength={1000} rows={2}
+                placeholder={tr('settings.preserveTermsPlaceholder')} disabled={!form.optimizeEnabled}
+                onChange={event => change('preserveTerms', event.target.value)} />
+            </label>
           </div>
         </section>
 

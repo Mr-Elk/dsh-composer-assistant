@@ -6,19 +6,20 @@ src=$(cd "$(dirname "$0")/.." && pwd)
 build=${DSH_IA_BUILD:-/tmp/dsh-input-assistant-build}
 mkdir -p "$build"
 rsync -a --delete --exclude .git --exclude node_modules --exclude dist --exclude '._*' "$src"/ "$build"/
-[ -d "$build/node_modules" ] || (cd "$build" && pnpm install --frozen-lockfile)
 cd "$build"
+# The lockfile can add dependencies even when node_modules already exists.
+pnpm install --frozen-lockfile
 pnpm typecheck
+pnpm build
+mkdir -p dist "$src/dist"
+pnpm pack --pack-destination dist >/dev/null
 if [ "${SKIP_EDGE:-0}" = "1" ]; then
   pnpm exec vitest run --exclude tests/browser-theme.test.ts
 else
   pnpm test
 fi
-pnpm build
-mkdir -p dist "$src/dist"
-rm -f dist/*.tgz
-pnpm pack --pack-destination dist >/dev/null
-cp dist/*.tgz "$src/dist/"
+pnpm test:package
 ver=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")
 name=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).name")
+cp "dist/$name-$ver.tgz" "$src/dist/"
 echo "built: $src/dist/$name-$ver.tgz"

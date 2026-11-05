@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AssistantSettings } from '../src/browser/settings'
 import { BrowserRuntime, type ConnectionFace } from '../src/browser/runtime'
 import { DEFAULT_CONFIG, type AssistantConfig, type GenerationRequest, type ModelOption } from '../src/core/types'
+import { PLUGIN_VERSION } from '../src/core/version'
 
 // With --no-isolate, the cached library screen can refer to a previous jsdom body.
 const screen = within(document.body)
@@ -193,7 +194,7 @@ describe('DSH input assistant settings section', () => {
       fireEvent.click(screen.getByRole('button', { name: '关于' }))
       const dialog = screen.getByRole('dialog')
       expect(dialog.textContent).toContain('关于输入助手')
-      expect(dialog.textContent).toContain('0.3.0')
+      expect(dialog.textContent).toContain(PLUGIN_VERSION)
       expect(dialog.textContent).toContain('dsh plugin --profile desktop add dsh-composer-assistant')
       fireEvent.click(screen.getByRole('button', { name: '复制命令' }))
       await screen.findByText('命令已复制')
@@ -298,4 +299,13 @@ describe('DSH input assistant settings section', () => {
     await screen.findByRole('alert')
     expect(f.setters).toHaveLength(0)
   })
+  it('saves glossary terms from the optimization section', async () => {
+    const f = settingsFixture({ settings: { nextEnabled: false } })
+    const field = await screen.findByRole('textbox', { name: '术语保护' })
+    fireEvent.change(field, { target: { value: 'DSH, lint' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(f.setters).toHaveLength(1))
+    expect(f.setters[0]).toMatchObject({ preserveTerms: 'DSH, lint' })
+  })
+
 })

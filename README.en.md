@@ -4,9 +4,16 @@
 
 Predict the next message, continue a draft, or polish a prompt in the DeepSeek Harness (DSH) composer. The plugin offers editable text only: press `Tab` to accept or `Esc` to dismiss. It never sends a message for you.
 
-Current public release: [`dsh-composer-assistant@0.3.0`](https://www.npmjs.com/package/dsh-composer-assistant).
+The current npm release is still `0.3.0`; `0.4.0` has not been published.
 
-The English documentation is available in the GitHub source. The already-published `0.3.0` npm tarball predates this update and does not contain `README.en.md`; the repository package manifest now includes it for a future release.
+## What changes in 0.4.0 (unreleased)
+
+- **Automatic suggestions are opt-in for new installs:** next-message prediction and draft completion start disabled; manual optimization stays available. Automatic calls default to 10 per hour. Existing saved switches and limits are preserved.
+- **The budget survives restarts:** the merged storage fix persists a reservation before the model call and refuses automatic calls when storage fails.
+- **Streaming suggestions:** ghost text appears while the host is still generating. The final result remains authoritative.
+- **Session request stats:** the settings popover shows request count and average request time, with accept rate and post-accept edits. It counts requests, not model calls or billing.
+- **Glossary protection:** list terms in Settings that optimization must keep verbatim.
+- **0.3.0 capabilities remain:** Chinese/English switching, the redesigned settings page, localized errors, and settings-draft recovery.
 
 ## Features
 
@@ -16,13 +23,17 @@ The English documentation is available in the GitHub source. The already-publish
 | Draft completion | Suggests a suffix after you pause while drafting; it does not run when the caret is away from the end of the draft |
 | Prompt optimization | Rewrites the full draft or selected text; review a diff, undo, copy the original, or ask for another version |
 
-Inline ghost text is limited to the editor's visible area. Longer suggestions use a candidate card. Regenerating a suggestion for the same turn is not counted against the automatic-call limit, but may still incur model charges.
+“Regenerate” does not add a conversation turn, but every attempt can still call a model and incur charges.
 
 ## Interface
 
 | Chinese settings | English settings |
 | --- | --- |
 | <img src="docs/images/settings-zh.png" alt="Chinese settings" width="420"> | <img src="docs/images/settings-en.png" alt="English settings" width="420"> |
+
+The settings page is grouped; the composer shows only `✦ Optimize` and `⚙`. One-off actions such as protect selection, view diff, undo, copy original, and regenerate stay in the composer instead of the settings dialog.
+
+The settings popover footer shows `N requests · 1.4 s`. Opening it shows request count, average request time, suggestions shown, accepted, accept rate, and edits after acceptance. The count includes failed, cancelled, and budget-blocked generation requests; it is not a model-call count or a bill. It covers the current session only.
 
 ## Installation
 
@@ -31,7 +42,7 @@ Supported DSH range declared by the package: `>=0.2.1-rc.2 <0.3.0-0`. The packag
 Run this command from a terminal where the DSH Desktop `dsh` command is available:
 
 ```shell
-dsh plugin --profile desktop add dsh-composer-assistant@0.3.0
+dsh plugin --profile desktop add dsh-composer-assistant@0.4.0
 ```
 
 You can also install it from DSH's plugin manager. A normal install does not require a local build or a `.tgz` file. To install a locally built package from the repository:
@@ -40,7 +51,7 @@ You can also install it from DSH's plugin manager. A normal install does not req
 pnpm install --frozen-lockfile
 pnpm build
 pnpm pack --pack-destination dist
-dsh plugin --profile desktop add ./dist/dsh-composer-assistant-0.3.0.tgz
+dsh plugin --profile desktop add ./dist/dsh-composer-assistant-0.4.0.tgz
 ```
 
 ## Upgrade and rollback
@@ -48,7 +59,7 @@ dsh plugin --profile desktop add ./dist/dsh-composer-assistant-0.3.0.tgz
 To upgrade, replace the version in the command with the version you want, then fully quit and restart DSH:
 
 ```shell
-dsh plugin --profile desktop add dsh-composer-assistant@0.3.0
+dsh plugin --profile desktop add dsh-composer-assistant@0.4.0
 ```
 
 DSH does not automatically update third-party plugins. Use DSH's plugin manager or install a specific version with the command above.
@@ -59,9 +70,7 @@ To roll back to a saved package archive:
 dsh plugin --profile desktop add ./path/to/known-good.tgz
 ```
 
-If an older version is available on npm, append `@version` to the package name to install it; do not copy a placeholder literally.
-
-Keep a known-good `.tgz` before upgrading. When `0.3.0` was released, npm had no earlier stable release available for rollback; `0.0.0-stage` is a prerelease and is not recommended as a stable fallback.
+If an older version is available on npm, append `@version` to the package name to install it; do not copy a placeholder literally. Keep a known-good `.tgz` before upgrading. Until `0.4.0` is published, npm still serves `0.3.0`.
 
 ## Use
 
@@ -73,24 +82,28 @@ Keep a known-good `.tgz` before upgrading. When `0.3.0` was released, npm had no
 
 When a `/` command menu or `@` reference menu is open, DSH owns `Tab` and the plugin does not intercept it. The code suppresses requests while an IME composition is active, but actual IME and native keyboard behavior still needs validation on the target system.
 
-The first time you open the composer, a short onboarding hint points to Optimize and Settings. Dismissing it with the button, `Esc`, or an outside click prevents it from appearing automatically again.
+The first time you open the composer, a short onboarding hint explains that automatic suggestions start disabled and that manual optimization can still incur charges. Dismissing it with the button, `Esc`, or an outside click prevents it from appearing automatically again.
 
 ## Settings
 
 | Group | Setting | Default | Details |
 | --- | --- | --- | --- |
 | General | Language | Follow DSH | Follow DSH, or force Chinese or English |
-| Features | Prompt optimization, next-message prediction, draft completion | All enabled | Each feature can be disabled independently |
+| Features | Prompt optimization | On | Calls a model only when you click the button |
+| Features | Next-message prediction, draft completion | Off | New installs do not call automatically; enable each separately |
 | Suggestions | Suggestion length | Standard | Short / Standard / Long |
 | Optimization | Strength | Standard | Light / Standard / Deep |
+| Optimization | Protected terms | Empty | One per line or comma separated; kept verbatim during optimization, up to 20 |
 | Auxiliary model | Model | Follow composer | Optionally choose a provider and model from the DSH catalog |
 | Advanced | Conversation context limit | 16,000 characters | Caps the conversation text used in requests |
 | Advanced | Suggestion timeout | 15 seconds | Configurable from 5 to 60 seconds |
-| Advanced | Automatic calls per hour | 0 | Rolling 60-minute budget persisted across restarts; applies only to automatic prediction and completion; 0 means unlimited |
+| Advanced | Automatic calls per hour | 10 | Rolling 60-minute budget persisted across restarts; applies only to automatic prediction and completion; 0 means unlimited |
 | Advanced | Temperature | 0.7 | Range 0–2; lower values are more stable |
 | Advanced | Extra instruction | Empty | Appended to the system prompt; up to 500 characters |
 
 Draft completion debounce is 600 ms, the minimum interval between automatic requests is 2 seconds, and the draft limit is 8,000 characters. These fixed values are not exposed in Settings.
+
+The defaults above apply to new installs and “Restore defaults”. Upgrades preserve saved switches and limits, including an explicit `0` (unlimited); only missing or invalid fields fall back to the new defaults.
 
 **Unsaved settings are retained.** When the settings component unmounts with changes still in the form, the plugin writes that settings form to `sessionStorage` for the current browser tab. Reopening Settings in the same tab restores the unsaved changes when they still differ from the saved DSH settings, and shows a notice. A successful save or explicit reload clears the stored form. “Restore defaults” changes the form only; press Save to persist it to DSH.
 
@@ -106,25 +119,26 @@ The budget depends on locally stored data and the system clock. The first upgrad
 
 - Prediction, completion, and optimization call models through DSH's LLM interface. The relevant draft or selection and the conversation text context needed for generation are sent to the model provider configured in DSH; processing is not local-only.
 - By default, the plugin follows the model selected in the composer. If you choose an auxiliary model, calls use that provider and model. Charges and data handling follow your DSH configuration and the provider's policies.
-- The hourly limit counts automatic prediction and completion in a rolling 60-minute window and persists across restarts. Manual optimization and “Regenerate” are explicit user actions and are not counted. A limit of `0` leaves automatic calls unlimited, so it is not a cap on total model costs.
+- Automatic suggestions are disabled for new installs. Manual optimization and “Regenerate” are explicit user actions, can still incur charges, and are not blocked by the automatic-call limit. The limit is not an account spending cap.
 - The plugin never sends or submits a suggestion automatically. You decide whether to accept and send it.
 - The plugin uses DSH host services and its LLM interface; this repository does not configure a separate plugin-operated model API or analytics service. Data handling by DSH and model providers is outside the plugin's control.
 - Saved settings live in DSH plugin storage. Unsaved **settings form values** are temporarily stored in the current tab's `sessionStorage`; this is separate from the composer draft.
+- Streaming only makes the browser read a few more local partials; it does not add model calls.
 
 ## Verification scope and known limitations
 
 The package metadata declares DSH compatibility as `>=0.2.1-rc.2 <0.3.0-0` and explicitly lists compatibility records for `0.2.1-rc.3` and `0.2.1-rc.5`. Automated tests, browser fixtures, and an isolated npm install do not establish full compatibility with a live DSH Desktop environment.
 
-Post-release audit on 2026-11-03 (published 0.3.0 tarball): the npm 0.3.0 tarball's SRI matched registry metadata. A clean consumer project installed it successfully on Node.js 24.22.1 / npm 11.9.0, and the host entry imported. That audit passed 159 automated tests outside the browser-theme suite and could not start that suite because neither Edge nor Chrome was installed. It did not run the plugin in a live DSH Desktop window, and it predates the merged budget-storage fixes.
-
-Integration check on 2026-11-05 (PR #1 merged with current main): on macOS with Node.js 22.23.2, pnpm 11.28.5, and an installed Chrome, `pnpm typecheck` passed; `pnpm test` passed all 193 tests in 20 files, including five browser-theme tests launched in Chrome; `pnpm test --no-isolate --maxWorkers=1` also passed all 193; `pnpm build` passed; `pnpm pack --pack-destination dist` produced the 0.3.0 archive; `pnpm test:package` and `pnpm publish:check` passed, and the archive includes `README.en.md`. A full DSH Desktop quit/restart with a real model call, a real Edge window, and a real Chinese IME remain unverified.
+`0.4.0` is not published yet. Automated checks and package verification for this branch are recorded in [docs/validation.md](docs/validation.md). A full DSH Desktop quit/restart with a real model call, a real Edge window, and a real Chinese IME remain unverified.
 
 - Ghost text is limited to the visible editor area; longer suggestions use a candidate card.
-- While `/` or `@` menus are open, `Tab` belongs to the DSH menu.
+- Streaming applies only to ghost text; candidate cards and long suggestions still appear at once.
+- Request stats cover the current session only and reset on reload. The count includes failed, cancelled, and budget-blocked requests; it is not a model-call count or a bill.
 - The automatic-call budget lives in local plugin storage and depends on the system clock. It cannot recover calls made before the persistent version, and is lost if plugin data is deleted or the configuration directory changes. It does not coordinate multiple independent DSH processes and is not an account-level spending cap.
 - A saved automatic-call reservation is not refunded when the request is cancelled, times out, or fails. Manual optimization and “Regenerate” are neither counted nor blocked by the limit.
-- Version 0.3.0 is not claimed to have passed every real Edge window, Chinese IME, native `@` menu, candidate-card positioning, undo, or focus interaction. These need case-by-case validation with the target DSH, operating system, and input method.
-- Automated browser fixtures use local substitutes and do not call paid models. They test plugin logic, not model quality or every native host interaction.
+- While `/` or `@` menus are open, `Tab` belongs to the DSH menu.
+- A real Chinese IME and native keyboard behavior still need validation on the target system.
+- The repository is on an exFAT volume; if pnpm fails there, use `./scripts/local-dev.sh` to build in an APFS temporary directory.
 
 ## Development checks
 

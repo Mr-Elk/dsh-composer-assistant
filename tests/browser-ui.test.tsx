@@ -274,6 +274,37 @@ describe('composed browser surfaces', () => {
     await waitFor(() => expect(f.inputStore.getSnapshot().draft).toBe('请继续解释'))
     expect(f.runtime.controllerFor('session-ui').getSnapshot().metrics.exposures).toBe(1)
   })
+  it('keeps Tab working after the host replaces the editor node', async () => {
+    const f = uiFixture('', 'panel', true)
+    await screen.findByRole('button', { name: '采纳' })
+    const replacement = document.createElement('div')
+    replacement.setAttribute('data-composer-input', '')
+    replacement.contentEditable = 'true'
+    replacement.tabIndex = 0
+    f.editor.removeAttribute('data-composer-input')
+    f.editor.after(replacement)
+    act(() => { replacement.focus() })
+    const key = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    fireEvent(replacement, key)
+    expect(key.defaultPrevented).toBe(true)
+    await waitFor(() => expect(f.inputStore.getSnapshot().draft).toBe('请继续解释'))
+    expect(f.insertText).toHaveBeenCalledTimes(1)
+  })
+  it('tracks IME composition after the editor node is replaced', async () => {
+    const f = uiFixture('', 'panel', true)
+    await screen.findByRole('button', { name: '采纳' })
+    const controller = f.runtime.controllerFor('session-ui')
+    expect(controller.getSnapshot().suggestion).not.toBeNull()
+    const replacement = document.createElement('div')
+    replacement.setAttribute('data-composer-input', '')
+    replacement.contentEditable = 'true'
+    replacement.tabIndex = 0
+    f.editor.removeAttribute('data-composer-input')
+    f.editor.after(replacement)
+    act(() => { replacement.focus() })
+    fireEvent.compositionStart(replacement)
+    expect(controller.getSnapshot().suggestion).toBeNull()
+  })
   it('falls back to the card when the caret leaves too little inline width', async () => {
     const box = { left: 100, top: 500, right: 120, bottom: 520, width: 20, height: 20, x: 100, y: 500, toJSON: () => ({}) } as DOMRect
     const rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(box)
@@ -307,5 +338,21 @@ describe('composed browser surfaces', () => {
     expect(ghostOverflows(60, 60)).toBe(false)
     expect(ghostOverflows(62, 60)).toBe(true)
     expect(ghostOverflows(400, Number.NaN)).toBe(false)
+  })
+})
+
+describe('usage panel', () => {
+  it('opens from the quick settings footer and shows session counters', async () => {
+    uiFixture('原稿')
+    await waitFor(() => expect((screen.getByRole('button', { name: '优化' }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: '输入助手设置' }))
+    fireEvent.click(screen.getByRole('button', { name: /次请求/ }))
+    expect(screen.queryByRole('dialog', { name: '输入助手' })).toBeNull()
+    const dialog = screen.getByRole('dialog', { name: '本次请求统计' })
+    expect(dialog.textContent).toContain('请求次数')
+    expect(dialog.textContent).toContain('平均请求耗时')
+    expect(dialog.textContent).toContain('不是模型调用数或账单')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: '本次请求统计' })).toBeNull()
   })
 })

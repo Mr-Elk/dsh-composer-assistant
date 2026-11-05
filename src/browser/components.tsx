@@ -12,6 +12,8 @@ import { diffText } from '../core/diff'
 import { isSettingsDraftDirty, settingsPatch } from './settings-draft'
 import { errorCopy } from './error-copy'
 import type { AssistantConfig } from '../core/types'
+import type { UsageMetrics } from './controller'
+import { usageCopy, usageFoot, usageRows } from './usage'
 
 type RuntimeProps = { runtime: BrowserRuntime }
 type RightProps = PropsRuntime<'conversation.input.right'> & RuntimeProps
@@ -98,6 +100,38 @@ function GearIcon() {
 }
 
 /** The right slot owns input observation; the overlay only paints the same controller's state. */
+function UsageDialog({ metrics, translate, onClose }: {
+  metrics: UsageMetrics; translate: (key: MessageKey, vars?: Record<string, string | number>) => string; onClose: () => void
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const close = useRef(onClose)
+  const [copied, setCopied] = useState<'idle' | 'ok' | 'failed'>('idle')
+  close.current = onClose
+  useEffect(() => {
+    closeRef.current?.focus()
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); close.current() } }
+    document.addEventListener('keydown', key, true)
+    return () => document.removeEventListener('keydown', key, true)
+  }, [])
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(usageCopy(metrics, translate)); setCopied('ok') }
+    catch { setCopied('failed') }
+  }
+  return createPortal(<div className="dsh-ia dsh-ia-about-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
+    <div className="dsh-ia-about dsh-ia-usage" role="dialog" aria-modal="true" aria-label={translate('usage.title')}>
+      <div className="dsh-ia-about-head"><b>{translate('usage.title')}</b>
+        <button ref={closeRef} type="button" className="dsh-ia-about-close" aria-label={translate('about.close')} onClick={onClose}>×</button>
+      </div>
+      {usageRows(metrics, translate).map(row => <div key={row.label} className="dsh-ia-about-row"><span>{row.label}</span><span>{row.value}</span></div>)}
+      <p className="dsh-ia-about-note">{translate('usage.note')}</p>
+      <div className="dsh-ia-usage-actions">
+        <span role="status">{copied === 'ok' ? translate('usage.copied') : copied === 'failed' ? translate('usage.copyFailed') : ''}</span>
+        <button type="button" className="dsh-ia-primary" onClick={() => { void copy() }}>{translate('usage.copy')}</button>
+      </div>
+    </div>
+  </div>, document.body)
+}
+
 export function AssistantRight({ runtime, sessionId, useInput, useSession, inputActions }: RightProps) {
   const { controller, state } = useController(runtime, sessionId)
   const input = useInput(value => value)
@@ -121,6 +155,7 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
   const [conflict, setConflict] = useState(false)
   const [showFullSettings, setShowFullSettings] = useState(false)
   const [showDiff, setShowDiff] = useState(false)
+  const [showUsage, setShowUsage] = useState(false)
   const [firstRun, setFirstRun] = useState(false)
   const locale = resolveUiLocale(effectiveLanguage(state.settings.language), runtime.locale?.() ?? 'zh')
   const tr = (key: MessageKey, vars?: Record<string, string | number>) => t(locale, key, vars)
@@ -153,11 +188,30 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
     controller.bind({ sessionId, input, actions: inputActions, running, editor: findEditor(anchor.current), route: model.current ?? undefined })
   }, [controller, sessionId, input, inputActions, running, model.current, removed, generation])
   useEffect(() => {
-    const editor = findEditor(anchor.current)
-    if (!editor) return
+    // The host can replace the composer node (reconnect, re-render, session
+    // switch). Resolve the editor on every event instead of holding the node
+    // that happened to exist at mount, or Tab and IME tracking keep listening
+    // to a detached element and fail silently.
+    const currentEditor = (): HTMLElement | null => findEditor(anchor.current)
+    const insideEditor = (target: EventTarget | null): boolean => {
+      const editor = currentEditor()
+      return Boolean(editor && target instanceof Node && (target === editor || editor.contains(target)))
+    }
+    // A composition can end after its node was replaced. Remember the node that
+    // started it so the matching end still clears the composing flag.
+    let composingNode: Node | null = null
     const selectionChanged = () => controller.notifySelectionChange()
-    const compositionStart = () => controller.setComposing(true)
-    const compositionEnd = () => controller.setComposing(false)
+    const focusChanged = (event: FocusEvent) => { if (insideEditor(event.target)) selectionChanged() }
+    const compositionStart = (event: CompositionEvent) => {
+      if (!insideEditor(event.target)) return
+      composingNode = event.target as Node
+      controller.setComposing(true)
+    }
+    const compositionEnd = (event: CompositionEvent) => {
+      if (event.target !== composingNode && !insideEditor(event.target)) return
+      composingNode = null
+      controller.setComposing(false)
+    }
     const keyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         if (document.querySelector('.dsh-ia-pop')) return
@@ -165,24 +219,25 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
         if (snapshot.suggestion) { event.preventDefault(); controller.dismissSuggestion(); return }
         if (snapshot.notice) { controller.clearNotice(); return }
       }
+      const editor = currentEditor()
       if (!controller.getSnapshot().suggestion || !canUseTab(event, editor, false)) return
       if (![...document.querySelectorAll('[data-dsh-ia-visible-suggestion]')].some(node => node.getAttribute('data-dsh-ia-session') === sessionId)) return
       if (controller.acceptSuggestion()) event.preventDefault()
     }
     document.addEventListener('selectionchange', selectionChanged)
-    editor.addEventListener('focus', selectionChanged)
-    editor.addEventListener('blur', selectionChanged)
-    editor.addEventListener('compositionstart', compositionStart)
-    editor.addEventListener('compositionend', compositionEnd)
+    document.addEventListener('focus', focusChanged, true)
+    document.addEventListener('blur', focusChanged, true)
+    document.addEventListener('compositionstart', compositionStart)
+    document.addEventListener('compositionend', compositionEnd)
     // Capture phase: the composer's Lexical keymap runs on the editor element and
     // would otherwise consume Tab before this handler sees it.
     window.addEventListener('keydown', keyDown, true)
     return () => {
       document.removeEventListener('selectionchange', selectionChanged)
-      editor.removeEventListener('focus', selectionChanged)
-      editor.removeEventListener('blur', selectionChanged)
-      editor.removeEventListener('compositionstart', compositionStart)
-      editor.removeEventListener('compositionend', compositionEnd)
+      document.removeEventListener('focus', focusChanged, true)
+      document.removeEventListener('blur', focusChanged, true)
+      document.removeEventListener('compositionstart', compositionStart)
+      document.removeEventListener('compositionend', compositionEnd)
       window.removeEventListener('keydown', keyDown, true)
     }
   }, [controller, sessionId])
@@ -286,12 +341,16 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
         </select>
       </div>
       {(error || conflict) && <p className="dsh-ia-pop-error" role="alert">{conflict ? tr('settings.conflict') : error}</p>}
+      <div className="dsh-ia-pop-foot">
+        <button type="button" className="dsh-ia-link" onClick={() => { setOpen(false); setShowUsage(true) }}>{usageFoot(state.metrics, tr)}</button>
+      </div>
       <div className="dsh-ia-pop-actions">
         {dirty && <span className="dsh-ia-muted">{tr('settings.unsaved')}</span>}
         <button type="button" onClick={() => closePopover(true)}>{tr('popover.cancel')}</button>
         <button type="button" className="dsh-ia-primary" disabled={!dirty || saving || conflict || state.settingsSaving} onClick={() => { void savePopover() }}>{saving || state.settingsSaving ? tr('settings.saving') : tr('popover.save')}</button>
       </div>
     </div>, document.body)}
+    {showUsage && <UsageDialog metrics={state.metrics} translate={tr} onClose={() => { setShowUsage(false); gearRef.current?.focus() }} />}
   </div>
 }
 
@@ -308,6 +367,8 @@ export function AssistantOverlay({ runtime, sessionId }: OverlayProps) {
   const [narrow, setNarrow] = useState(false)
   const [protect, setProtect] = useState<{ left: number; top: number } | null>(null)
   const suggestion = state.suggestion
+  const streaming = state.streaming?.text ?? ''
+  const streamingActive = streaming.length > 0
   const locale = resolveUiLocale(effectiveLanguage(state.settings.language), runtime.locale?.() ?? 'zh')
   const tr = (key: MessageKey) => t(locale, key)
   // A suggestion longer than the composer's visible area cannot render inline;
@@ -344,9 +405,10 @@ export function AssistantOverlay({ runtime, sessionId }: OverlayProps) {
     if (suggestion && ((panelMode && panelPlacement) || (!panelMode && geometry))) controller.markExposed(suggestion.snapshot.requestId)
   }, [controller, suggestion, geometry, panelPlacement, panelMode])
   useLayoutEffect(() => {
-    if (!suggestion || state.settings.displayMode !== 'ghost') { setGeometry(null); return }
+    if ((!suggestion && !streamingActive) || state.settings.displayMode !== 'ghost') { setGeometry(null); return }
     const update = () => {
-      const result = measureGhostDetail(findEditor(anchor.current), suggestion.snapshot.draft === '')
+      const empty = suggestion ? suggestion.snapshot.draft === '' : (state.streaming?.empty ?? false)
+      const result = measureGhostDetail(findEditor(anchor.current), empty)
       setGeometry(result.kind === 'ok' ? result.geometry : null)
       // A caret near the right edge leaves too little room for inline text; the
       // card is the only surface that can still show the suggestion.
@@ -363,7 +425,7 @@ export function AssistantOverlay({ runtime, sessionId }: OverlayProps) {
     if (editor) resize?.observe(editor)
     return () => { window.removeEventListener('resize', update); window.removeEventListener('scroll', update, true)
       document.removeEventListener('selectionchange', update); editor?.removeEventListener('focus', update); editor?.removeEventListener('blur', update); resize?.disconnect() }
-  }, [suggestion, state.settings.displayMode])
+  }, [suggestion, streamingActive, state.settings.displayMode])
   useLayoutEffect(() => {
     if (!suggestion || state.settings.displayMode !== 'ghost' || !geometry || !ghostRef.current) return
     // scrollHeight reflects the unclipped text; anything taller than the visible
@@ -377,6 +439,8 @@ export function AssistantOverlay({ runtime, sessionId }: OverlayProps) {
       style={panelPlacement ?? { visibility: 'hidden' }} data-dsh-ia-visible-suggestion={panelPlacement ? '' : undefined} data-dsh-ia-session={sessionId}>
       <span className="dsh-ia-candidate-text">{suggestion.text}</span><button type="button" onPointerDown={event => event.preventDefault()} onClick={() => { void controller.regenerateSuggestion() }}>{tr('context.regenerate')}</button><button type="button" onPointerDown={event => event.preventDefault()} onClick={() => controller.acceptSuggestion()}>{tr('context.accept')}</button>
       <span className="dsh-ia-candidate-esc" aria-hidden="true">{tr('context.esc')}</span><button type="button" aria-label={tr('context.ignore')} onClick={() => controller.dismissSuggestion()}>×</button></div>, document.body)}
+    {!suggestion && streaming && geometry && createPortal(<span className="dsh-ia dsh-ia-ghost dsh-ia-ghost-streaming" style={ghostStyle}
+      aria-hidden="true" data-dsh-ia-streaming="" data-dsh-ia-session={sessionId}>{streaming}</span>, document.body)}
     {suggestion && !panelMode && geometry && <>
       {suggestion.snapshot.draft === '' && <span hidden data-dsh-ia-empty-ghost="" />}
       {createPortal(<span ref={ghostRef} className="dsh-ia dsh-ia-ghost"  style={ghostStyle}

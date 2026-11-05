@@ -21,6 +21,34 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm test --no-isolate --maxWorkers=1
       - run: pnpm build
       - run: pnpm pack --pack-destination dist
+      - run: pnpm test:package
+
+  linux:
+    name: Linux / Node ${{ matrix.node }}
+    # Playwright 1.56.1 supports Ubuntu 24.04, but not the newer latest image.
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.19.0', '24', '26']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.28.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check preinstalled browser
+        run: google-chrome --version
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm pack --pack-destination dist
+      - run: pnpm test
+      - run: pnpm test --no-isolate --maxWorkers=1
       - run: pnpm test:package

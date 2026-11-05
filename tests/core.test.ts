@@ -148,6 +148,23 @@ describe('auxiliary call budget', () => {
     for (let index = 0; index < 50; index += 1) expect(budget.allow('a', 0, 1000 + index)).toBe(true)
     expect(budget.count('a', 1010)).toBe(50)
   })
+  it('survives a restart through snapshot and hydrate', () => {
+    const before = new CallBudget(1000)
+    expect(before.allow('global', 2, 1000)).toBe(true)
+    expect(before.allow('global', 2, 1100)).toBe(true)
+    // A new instance stands in for a restarted host.
+    const after = new CallBudget(1000)
+    after.hydrate(before.snapshot(1200), 1200)
+    expect(after.count('global', 1200)).toBe(2)
+    expect(after.allow('global', 2, 1300)).toBe(false)
+    // Once the window slides past the stored calls the limit frees up again.
+    expect(after.allow('global', 2, 2200)).toBe(true)
+  })
+  it('drops timestamps outside the window when hydrating', () => {
+    const budget = new CallBudget(1000)
+    budget.hydrate({ global: [100, 1900] }, 2000)
+    expect(budget.count('global', 2000)).toBe(1)
+  })
 })
 
 describe('bounded context, snapshots, and diff', () => {

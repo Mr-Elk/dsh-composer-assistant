@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import type { ComponentProps } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AssistantSettings } from '../src/browser/settings'
 import { BrowserRuntime, type ConnectionFace } from '../src/browser/runtime'
 import { DEFAULT_CONFIG, type AssistantConfig, type GenerationRequest, type ModelOption } from '../src/core/types'
 
+// With --no-isolate, the cached library screen can refer to a previous jsdom body.
+const screen = within(document.body)
 const runtimes: BrowserRuntime[] = []
 afterEach(() => { cleanup(); runtimes.splice(0).forEach(runtime => runtime.dispose()); document.body.innerHTML = ''; sessionStorage.clear() })
 
@@ -45,6 +47,12 @@ function settingsFixture(options: { models?: ModelOption[]; modelsError?: boolea
 }
 
 describe('DSH input assistant settings section', () => {
+  it('queries the active document when test files share a worker', () => {
+    const result = render(<button>当前设置页测试文档</button>)
+    expect(screen.getByRole('button', { name: '当前设置页测试文档' }))
+      .toBe(result.getByRole('button', { name: '当前设置页测试文档' }))
+  })
+
   it('restores unsaved settings after the panel unmounts and reopens in the same tab', async () => {
     const f = settingsFixture()
     await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())

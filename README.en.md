@@ -132,7 +132,7 @@ The budget depends on locally stored data and the system clock. The first upgrad
 
 The package metadata declares DSH compatibility as `>=0.2.1-rc.2 <0.3.0-0` and explicitly lists compatibility records for `0.2.1-rc.3` and `0.2.1-rc.5`. Automated tests, browser fixtures, and an isolated npm install do not establish full compatibility with a live DSH Desktop environment.
 
-`0.4.0` is not published yet. Automated checks and package verification for this branch are recorded in [docs/validation.md](docs/validation.md). A full DSH Desktop quit/restart with a real model call, a real Edge window, and a real Chinese IME remain unverified.
+`0.4.0` is not published yet. Automated checks and package verification for this branch are recorded in [docs/validation.md](docs/validation.md). The English release summary is in [CHANGELOG.en.md](CHANGELOG.en.md). A full DSH Desktop quit/restart with a real model call, a real Edge window, and a real Chinese IME remain unverified.
 
 - Ghost text is limited to the visible editor area; longer suggestions use a candidate card.
 - Streaming applies only to ghost text; candidate cards and long suggestions still appear at once.

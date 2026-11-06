@@ -160,7 +160,7 @@ pnpm test:web
 pnpm publish:check
 ```
 
-检查结果和未验证项见 [验收记录](docs/validation.md)。不要把编辑器测试或安装包检查当作真实模型质量验收。
+检查结果和未验证项见 [验收记录](docs/validation.md)。 英文更新日志见 [CHANGELOG.en.md](CHANGELOG.en.md)。不要把编辑器测试或安装包检查当作真实模型质量验收。
 
 ## 许可
 

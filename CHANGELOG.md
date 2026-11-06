@@ -1,6 +1,6 @@
 # 更新日志
 
-本文件记录面向用户的变更。完整的技术修正记录见 [`docs/CHANGELOG-0.1.2.md`](docs/CHANGELOG-0.1.2.md)。
+本文件记录面向用户的变更。完整的技术修正记录见 [`docs/CHANGELOG-0.1.2.md`](docs/CHANGELOG-0.1.2.md)。英文摘要见 [`CHANGELOG.en.md`](CHANGELOG.en.md)。
 
 ## [0.4.0] - 未发布
 

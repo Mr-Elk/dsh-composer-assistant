@@ -263,6 +263,7 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
     setFirstRun(false); setShowFullSettings(false); setBase({ ...state.settings }); setDraft({ ...state.settings }); setError(''); setConflict(false); setOpen(true)
   }
   const closePopover = (focus = false) => { setOpen(false); setShowFullSettings(false); setBase(null); setDraft(null); setError(''); setConflict(false); if (focus) gearRef.current?.focus() }
+  const reloadPopover = () => { setBase({ ...state.settings }); setDraft({ ...state.settings }); setError(''); setConflict(false) }
   const changeDraft = <K extends keyof AssistantConfig>(key: K, value: AssistantConfig[K]) => {
     setDraft(previous => previous ? { ...previous, [key]: value } : previous); setError('')
   }
@@ -335,7 +336,9 @@ export function AssistantRight({ runtime, sessionId, useInput, useSession, input
           <option value="long">{tr('settings.select.long')}</option>
         </select>
       </div>
-      {(error || conflict) && <p className="dsh-ia-pop-error" role="alert">{conflict ? tr('settings.conflict') : error}</p>}
+      {(error || conflict) && <p className="dsh-ia-pop-error" role="alert">{conflict ? tr('settings.conflict') : error}
+        {conflict && <button type="button" className="dsh-ia-link" onClick={reloadPopover}>{tr('settings.reload')}</button>}
+      </p>}
       <div className="dsh-ia-pop-foot">
         <button type="button" className="dsh-ia-link" onClick={() => { setOpen(false); setShowUsage(true) }}>{usageFoot(state.metrics, tr)}</button>
       </div>

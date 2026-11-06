@@ -151,6 +151,9 @@ describe('composed browser surfaces', () => {
     await f.runtime.saveSettings({ suggestionLength: 'long' })
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('设置已在其他窗口修改'))
     expect((screen.getByRole('button', { name: '保存' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '重新加载' }))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect((screen.getByRole('button', { name: '保存' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('closes quick settings when clicking outside', async () => {

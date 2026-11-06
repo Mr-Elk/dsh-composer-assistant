@@ -79,7 +79,7 @@ body[data-ds-dark-theme] .dsh-ia {--dsh-ia-fallback-bg:#232324;--dsh-ia-fallback
 
 .dsh-ia-settings {display:flex;flex-direction:column;gap:32px;width:100%;max-width:720px;padding:0}
 .dsh-ia-settings-fieldset {display:flex;flex-direction:column;gap:32px;border:0;padding:0;margin:0;min-width:0}
-.dsh-ia-settings-toast-layer {position:fixed;inset:0;z-index:10020;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:none}
+.dsh-ia-settings-toast-layer {position:fixed;inset:auto 0 28px;z-index:10020;display:flex;justify-content:center;padding:0 24px;pointer-events:none}
 .dsh-ia-settings-toast {display:inline-flex;align-items:center;gap:10px;max-width:min(440px,calc(100vw - 48px));padding:10px 16px;border:1px solid #bfe2cc;border-radius:12px;background:#eef8f2;box-shadow:0 8px 24px rgba(26,127,75,.14),0 1px 2px rgba(0,0,0,.04);font-size:14px;line-height:22px;font-weight:500;color:#176b43;pointer-events:none;animation:dsh-ia-toast-in .18s ease-out;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 84%,#1f9d61 16%);border-color:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 55%,#1f9d61 45%);color:color-mix(in srgb,var(--dsw-alias-label-primary,#111) 55%,#176b43 45%)}
 .dsh-ia-toast-icon {display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:13px;line-height:22px}
 .dsh-ia-settings-toast.is-success .dsh-ia-toast-icon {background:#1f9d61;color:#fff}

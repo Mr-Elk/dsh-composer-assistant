@@ -229,7 +229,7 @@ describe('DSH input assistant settings section', () => {
     expect(screen.queryByLabelText('温度')).toBeNull()
   })
 
-  it('opens about with version and a copyable upgrade command', async () => {
+  it('opens about with version and a copyable package name', async () => {
     const writeText = vi.fn(async () => {})
     const clipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
@@ -240,10 +240,11 @@ describe('DSH input assistant settings section', () => {
       const dialog = screen.getByRole('dialog')
       expect(dialog.textContent).toContain('关于输入助手')
       expect(dialog.textContent).toContain(PLUGIN_VERSION)
-      expect(dialog.textContent).toContain('dsh plugin --profile desktop add dsh-composer-assistant')
-      fireEvent.click(screen.getByRole('button', { name: '复制命令' }))
-      await screen.findByText('命令已复制')
-      expect(writeText).toHaveBeenCalledWith('dsh plugin --profile desktop add dsh-composer-assistant')
+      expect(dialog.textContent).toContain('dsh-composer-assistant')
+      expect(dialog.textContent).toContain('桌面端不接受 CLI 的 desktop profile 命令')
+      fireEvent.click(screen.getByRole('button', { name: '复制包名' }))
+      await screen.findByText('包名已复制')
+      expect(writeText).toHaveBeenCalledWith('dsh-composer-assistant')
       fireEvent.click(screen.getByRole('button', { name: '关闭' }))
       expect(screen.queryByRole('dialog')).toBeNull()
     } finally {
@@ -335,7 +336,7 @@ describe('DSH input assistant settings section', () => {
     settingsFixture()
     await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '关于' }))
-    const copy = await screen.findByRole('button', { name: '复制命令' })
+    const copy = await screen.findByRole('button', { name: '复制包名' })
     copy.focus()
     fireEvent.keyDown(document, { key: 'Tab' })
     expect(document.activeElement).toBe(screen.getByRole('button', { name: '关闭' }))

@@ -37,40 +37,43 @@
 
 ## 安装
 
-适用 DSH 版本范围：`>=0.2.1-rc.2 <0.3.0-0`。包声明的 Node.js 要求为 `>=22.19`；DSH Desktop 通常由应用提供运行时。
+适用 DSH 版本范围：`>=0.2.1-rc.2 <0.3.0-0`。**0.2.0-rc.2 及更早版本不支持**：插件依赖的 `dsh-client-store`、`dsh-client-ui-slots` 等 SDK 包在 0.2.0 中不存在。Node.js 要求 `>=22.19`；DSH Desktop 通常自带运行时。
 
-在可使用 DSH Desktop 命令的终端中安装已发布版本：
+**桌面端安装**
 
-```shell
-dsh plugin --profile desktop add dsh-composer-assistant@0.4.0
-```
+1. 打开 DSH 侧边栏 →「插件」。
+2. 搜索 `dsh-composer-assistant`，安装。
+3. 安装完成后完全退出 DSH，再重新打开。
 
-也可以在 DSH 的插件管理界面安装。普通安装不需要本地构建或 `.tgz` 文件。若从仓库安装本地构建包：
+不要对 `desktop` profile 执行 `dsh plugin --profile desktop add ...`。DSH CLI 会直接返回 `profile "desktop" is managed exclusively by the Electron application`；这是桌面端的设计，不是包损坏。
+
+**本地构建包**
 
 ```shell
 pnpm install --frozen-lockfile
 pnpm build
 pnpm pack --pack-destination dist
-dsh plugin --profile desktop add ./dist/dsh-composer-assistant-0.4.0.tgz
 ```
+
+构建后，在 DSH 插件页使用本地/文件安装入口（如果当前 DSH 版本提供）。没有该入口时，不要把 `.tgz` 路径交给 `--profile desktop` CLI；需要在 web 环境验证时可用：
+
+```shell
+dsh plugin --profile web add ./dist/dsh-composer-assistant-0.4.0.tgz
+```
+
+这条命令只影响 web profile，不代表桌面端已安装。
 
 ## 升级与回滚
 
-升级时将命令中的版本替换为目标版本，然后完全退出并重新打开 DSH：
+升级：DSH 侧边栏 →「插件」→ 找到 `dsh-composer-assistant` → 更新到目标版本，完成后完全退出并重新打开 DSH。DSH 不会自动升级第三方插件。
 
-```shell
-dsh plugin --profile desktop add dsh-composer-assistant@0.4.0
-```
+回滚：在插件页安装已知可用的版本或本地包（如果当前 DSH 版本提供本地安装入口）。升级前保留已知可用的 `.tgz`。`0.4.0` 发布前，npm 上仍是 `0.3.0`。
 
-DSH 不会自动升级第三方插件。可以使用 DSH 的插件管理界面，或执行上面的命令安装指定版本。
+## 安装排查
 
-回滚到已保存的安装包：
-
-```shell
-dsh plugin --profile desktop add ./path/to/known-good.tgz
-```
-
-如果 npm 上已有可用的旧版本，也可以在包名后加 `@版本号` 安装它；尖括号形式的占位符不要原样复制。升级前请保留已知可用的 `.tgz`；`0.4.0` 发布前，npm 上仍是 `0.3.0`。
+- `profile "desktop" is managed exclusively by the Electron application`：正常拦截，改用侧边栏「插件」，不要用 CLI 指向 desktop。
+- `incompatible with dsh`、缺少 `dsh-client-store` 或 `dsh-client-ui-slots`：DSH 低于 0.2.1-rc.2，先升级 DSH。这不是 Windows 特有问题。
+- `0.0.0-stage` 是占位包，不要安装。
 
 ## 使用
 

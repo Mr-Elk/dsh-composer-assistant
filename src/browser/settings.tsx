@@ -58,9 +58,9 @@ function AboutDialog({ open, onClose, translate }: {
   useDialogFocus(open, dialogRef, closeRef, onClose)
   useEffect(() => { if (!open) setCopied('idle') }, [open])
   if (!open) return null
-  const command = 'dsh plugin --profile desktop add dsh-composer-assistant'
+  const packageName = 'dsh-composer-assistant'
   const copy = async () => {
-    try { await navigator.clipboard.writeText(command); setCopied('ok') }
+    try { await navigator.clipboard.writeText(packageName); setCopied('ok') }
     catch { setCopied('failed') }
   }
   return createPortal(<div className="dsh-ia dsh-ia-about-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
@@ -73,8 +73,8 @@ function AboutDialog({ open, onClose, translate }: {
         <span className="dsh-ia-about-label">{translate('about.upgrade')}</span>
         <p className="dsh-ia-about-hint">{translate('about.upgradeHint')}</p>
         <div className="dsh-ia-about-command">
-          <code>{command}</code>
-          <button type="button" onClick={() => { void copy() }}>{copied === 'ok' ? translate('about.copied') : translate('about.copy')}</button>
+          <code>{packageName}</code>
+          <button type="button" onClick={() => { void copy() }}>{copied === 'ok' ? translate('about.copied') : translate('about.copyPackage')}</button>
         </div>
         <p className="dsh-ia-about-note" role="status">{copied === 'failed' ? translate('about.copyFailed') : translate('about.restartNote')}</p>
       </div>

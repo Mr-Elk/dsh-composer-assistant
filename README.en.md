@@ -37,40 +37,43 @@ The settings popover footer shows `N requests · 1.4 s`. Opening it shows reques
 
 ## Installation
 
-Supported DSH range declared by the package: `>=0.2.1-rc.2 <0.3.0-0`. The package declares Node.js `>=22.19`; DSH Desktop normally provides its own runtime.
+Supported DSH range: `>=0.2.1-rc.2 <0.3.0-0`. **0.2.0-rc.2 and earlier are not supported**: peer SDK packages such as `dsh-client-store` and `dsh-client-ui-slots` do not exist in 0.2.0. Node.js `>=22.19` is required; DSH Desktop normally provides its own runtime.
 
-Run this command from a terminal where the DSH Desktop `dsh` command is available:
+**Desktop install**
 
-```shell
-dsh plugin --profile desktop add dsh-composer-assistant@0.4.0
-```
+1. Open DSH's sidebar → Plugins.
+2. Search for `dsh-composer-assistant` and install it.
+3. Fully quit DSH and reopen it after installation.
 
-You can also install it from DSH's plugin manager. A normal install does not require a local build or a `.tgz` file. To install a locally built package from the repository:
+Do not run `dsh plugin --profile desktop add ...` against the desktop profile. The CLI returns `profile "desktop" is managed exclusively by the Electron application`; this is by design, not a broken package.
+
+**Local build**
 
 ```shell
 pnpm install --frozen-lockfile
 pnpm build
 pnpm pack --pack-destination dist
-dsh plugin --profile desktop add ./dist/dsh-composer-assistant-0.4.0.tgz
 ```
+
+After building, use the plugin page's local/file install entry if the current DSH version provides one. Without that entry, do not pass the `.tgz` path to the desktop-profile CLI. For web-only verification:
+
+```shell
+dsh plugin --profile web add ./dist/dsh-composer-assistant-0.4.0.tgz
+```
+
+That command affects only the web profile; it does not mean the desktop plugin is installed.
 
 ## Upgrade and rollback
 
-To upgrade, replace the version in the command with the version you want, then fully quit and restart DSH:
+To upgrade: DSH sidebar → Plugins → select `dsh-composer-assistant` → update to the target version, then fully quit and reopen DSH. DSH does not automatically update third-party plugins.
 
-```shell
-dsh plugin --profile desktop add dsh-composer-assistant@0.4.0
-```
+To roll back, install a known-good version or local package from the plugin page if the current DSH version provides a local install entry. Keep a known-good `.tgz` before upgrading. Until `0.4.0` is published, npm still serves `0.3.0`.
 
-DSH does not automatically update third-party plugins. Use DSH's plugin manager or install a specific version with the command above.
+## Installation troubleshooting
 
-To roll back to a saved package archive:
-
-```shell
-dsh plugin --profile desktop add ./path/to/known-good.tgz
-```
-
-If an older version is available on npm, append `@version` to the package name to install it; do not copy a placeholder literally. Keep a known-good `.tgz` before upgrading. Until `0.4.0` is published, npm still serves `0.3.0`.
+- `profile "desktop" is managed exclusively by the Electron application`: expected; use the sidebar → Plugins, not the CLI.
+- `incompatible with dsh`, missing `dsh-client-store`, or missing `dsh-client-ui-slots`: the DSH version is below 0.2.1-rc.2; upgrade DSH first. This is not Windows-specific.
+- `0.0.0-stage` is a placeholder package; do not install it.
 
 ## Use
 

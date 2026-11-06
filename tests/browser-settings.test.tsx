@@ -91,6 +91,23 @@ describe('DSH input assistant settings section', () => {
     expect(f.setters[0]).toEqual({ hourlyCallLimit: 1 })
   })
 
+  it('normalizes leading zeros in numeric settings', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: /高级设置/ }))
+    const cases = [
+      ['上下文上限', '0016000', '16000'],
+      ['建议超时', '020', '20'],
+      ['每小时调用上限', '01', '1'],
+      ['温度', '00.7', '0.7'],
+    ] as const
+    for (const [label, input, expected] of cases) {
+      const field = screen.getByLabelText(label) as HTMLInputElement
+      fireEvent.change(field, { target: { value: input } })
+      expect(field.value).toBe(expected)
+    }
+  })
+
   it('does not overwrite another switch changed after the settings page was opened', async () => {
     const f = settingsFixture()
     await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())

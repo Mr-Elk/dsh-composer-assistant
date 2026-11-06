@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -16,6 +16,15 @@ type SettingsProps = PropsRuntime<'settings.section'> & { runtime: BrowserRuntim
 const SETTINGS_DRAFT_KEY = 'dsh.input-assistant.settings-draft.v1'
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string
 type ToastState = { text: string; tone: 'success' | 'info'; ttl: number; id: number }
+/** Normalize numeric input while typing: strip leading zeros, keep decimals and sign. */
+function readNumberInput(event: ChangeEvent<HTMLInputElement>): number {
+  const input = event.currentTarget
+  const raw = input.value
+  const normalized = raw.replace(/^(-?)0+(?=\d)/, '$1')
+  if (normalized !== raw) input.value = normalized
+  return normalized === '' ? Number.NaN : Number(normalized)
+}
+
 
 function Chevron({ up = false }: { up?: boolean }) {
   return <svg className="dsh-ia-chevron" aria-hidden="true" viewBox="0 0 16 16" width="12" height="12" fill="none">
@@ -343,20 +352,20 @@ export function AssistantSettings({ runtime }: SettingsProps) {
           </button>
           {advancedOpen && <div className="dsh-ia-rows">
             <Row helpLabel={tr('common.help')} title={tr('settings.context')} hint={tr('settings.hint.context')} hintLabel={tr('settings.context')}>
-              <input type="number" aria-label={tr('settings.context')} value={form.maxHistoryChars} min={1000} max={64000} step={1000}
-                onChange={event => change('maxHistoryChars', Number(event.target.value))} />
+              <input type="number" aria-label={tr('settings.context')} value={Number.isNaN(form.maxHistoryChars) ? '' : form.maxHistoryChars} min={1000} max={64000} step={1000}
+                onChange={event => change('maxHistoryChars', readNumberInput(event))} />
             </Row>
             <Row helpLabel={tr('common.help')} title={tr('settings.timeout')} hint={tr('settings.hint.timeout')} hintLabel={tr('settings.timeout')}>
-              <input type="number" aria-label={tr('settings.timeout')} value={Math.round(form.suggestionTimeoutMs / 1000)} min={5} max={60} step={1}
-                onChange={event => change('suggestionTimeoutMs', Number(event.target.value) * 1000)} />
+              <input type="number" aria-label={tr('settings.timeout')} value={Number.isNaN(form.suggestionTimeoutMs) ? '' : Math.round(form.suggestionTimeoutMs / 1000)} min={5} max={60} step={1}
+                onChange={event => { const seconds = readNumberInput(event); change('suggestionTimeoutMs', Number.isNaN(seconds) ? Number.NaN : seconds * 1000) }} />
             </Row>
             <Row helpLabel={tr('common.help')} title={tr('settings.hourly')} hint={tr('settings.hint.hourly')} hintLabel={tr('settings.hourly')}>
-              <input type="number" aria-label={tr('settings.hourly')} value={form.hourlyCallLimit} min={0} max={2000} step={1} inputMode="numeric"
-                onChange={event => change('hourlyCallLimit', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
+              <input type="number" aria-label={tr('settings.hourly')} value={Number.isNaN(form.hourlyCallLimit) ? '' : form.hourlyCallLimit} min={0} max={2000} step={1} inputMode="numeric"
+                onChange={event => change('hourlyCallLimit', readNumberInput(event))} />
             </Row>
             <Row helpLabel={tr('common.help')} title={tr('settings.temperature')} hint={tr('settings.hint.temperature')} hintLabel={tr('settings.temperature')}>
               <input type="number" aria-label={tr('settings.temperature')} value={Number.isNaN(form.temperature) ? '' : form.temperature} min={0} max={2} step={0.1}
-                onChange={event => change('temperature', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
+                onChange={event => change('temperature', readNumberInput(event))} />
             </Row>
             <label className="dsh-ia-field dsh-ia-field-block">
               <span className="dsh-ia-field-title">{tr('settings.extra')} <InfoTip text={tr('settings.hint.extra')} label={`${tr('common.help')}: ${tr('settings.extra')}`} /></span>

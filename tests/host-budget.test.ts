@@ -341,7 +341,7 @@ describe('automatic budget through the real plugin, Host, Domain and JSON backen
 
   it('times out a storage wait without a late call after persistence completes', async () => {
     const f = await fixture()
-    await f.call('settings/set', { suggestionTimeoutMs: 1000 })
+    await f.call('settings/set', { suggestionTimeoutMs: 5000 })
     const entered = deferred(), release = deferred()
     f.hooks.beforeWrite = async () => { entered.resolve(); await release.promise }
     const pending = expect(f.generate(await f.request())).rejects.toMatchObject({ details: { code: 'TIMEOUT' } })

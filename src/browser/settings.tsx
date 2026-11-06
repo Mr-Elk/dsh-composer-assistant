@@ -1,13 +1,15 @@
-import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { resolveConfig } from '../core/config'
+import { countPreserveTerms, PRESERVE_TERMS_MAX } from '../core/protection'
 import { DEFAULT_CONFIG, type AssistantConfig, type ModelCatalog, type ModelOption } from '../core/types'
 import { PLUGIN_VERSION } from '../core/version'
 import { LANGUAGE_SELECTION_ENABLED, effectiveLanguage, resolveUiLocale, t, type MessageKey } from '../core/i18n'
 import { isSettingsDraftDirty, settingsPatch } from './settings-draft'
 import { InfoTip } from './info-tip'
+import { useDialogFocus } from './dialog-focus'
 import { errorCopy } from './error-copy'
 import type { BrowserRuntime } from './runtime'
 import type { UsageMetrics } from './controller'
@@ -51,16 +53,9 @@ function AboutDialog({ open, onClose, translate }: {
   open: boolean; onClose: () => void; translate: Translate
 }) {
   const closeRef = useRef<HTMLButtonElement>(null)
-  const close = useRef(onClose)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState<'idle' | 'ok' | 'failed'>('idle')
-  close.current = onClose
-  useEffect(() => {
-    if (!open) return
-    closeRef.current?.focus()
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); close.current() } }
-    document.addEventListener('keydown', key, true)
-    return () => document.removeEventListener('keydown', key, true)
-  }, [open])
+  useDialogFocus(open, dialogRef, closeRef, onClose)
   useEffect(() => { if (!open) setCopied('idle') }, [open])
   if (!open) return null
   const command = 'dsh plugin --profile desktop add dsh-composer-assistant'
@@ -69,7 +64,7 @@ function AboutDialog({ open, onClose, translate }: {
     catch { setCopied('failed') }
   }
   return createPortal(<div className="dsh-ia dsh-ia-about-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
-    <div className="dsh-ia-about" role="dialog" aria-modal="true" aria-label={translate('about.title')}>
+    <div ref={dialogRef} className="dsh-ia-about" role="dialog" aria-modal="true" aria-label={translate('about.title')}>
       <div className="dsh-ia-about-head"><b>{translate('about.title')}</b>
         <button ref={closeRef} type="button" className="dsh-ia-about-close" aria-label={translate('about.close')} onClick={onClose}>×</button>
       </div>
@@ -99,13 +94,53 @@ export function AssistantSettings({ runtime }: SettingsProps) {
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
   const toastSequence = useRef(0)
+  const shellRef = useRef<HTMLDivElement>(null)
+  const toastRef = useRef<HTMLDivElement>(null)
+  const [toastPosition, setToastPosition] = useState<{ left: number; top: number } | null>(null)
   const showToast = (text: string, tone: ToastState['tone'] = 'success', ttl = 2000) => {
+    setToastPosition(null)
     setToast({ text, tone, ttl, id: ++toastSequence.current })
   }
   useEffect(() => {
     if (!toast) return
     const timer = setTimeout(() => setToast(null), toast.ttl)
     return () => clearTimeout(timer)
+  }, [toast])
+
+  // Center inside the settings surface's visible area, then move to the nearest
+  // gap if the compact pill would cover an input, select or textarea.
+  useLayoutEffect(() => {
+    if (!toast) { setToastPosition(null); return }
+    const shell = shellRef.current, node = toastRef.current
+    if (!shell || !node) return
+    const shellRect = shell.getBoundingClientRect()
+    const left = Math.max(0, shellRect.left)
+    const top = Math.max(0, shellRect.top)
+    const right = Math.min(window.innerWidth, shellRect.right)
+    const bottom = Math.min(window.innerHeight, shellRect.bottom)
+    if (right <= left || bottom <= top) return
+    const rect = node.getBoundingClientRect()
+    const width = rect.width, height = rect.height
+    const centerX = (left + right) / 2
+    const centerY = (top + bottom) / 2
+    const controls = [...shell.querySelectorAll<HTMLElement>('input, select, textarea')]
+    const overlaps = (candidateTop: number) => controls.some(control => {
+      const r = control.getBoundingClientRect()
+      if (!r.width && !r.height) return false
+      return !(centerX + width / 2 <= r.left || centerX - width / 2 >= r.right
+        || candidateTop + height <= r.top || candidateTop >= r.bottom)
+    })
+    const minTop = top + 8
+    const maxTop = Math.max(minTop, bottom - height - 8)
+    const base = centerY - height / 2
+    const offsets = [0]
+    for (let step = 1; step <= 4; step += 1) offsets.push(-step * (height + 12), step * (height + 12))
+    let chosen = Math.min(Math.max(base, minTop), maxTop)
+    for (const offset of offsets) {
+      const candidate = Math.min(Math.max(base + offset, minTop), maxTop)
+      if (!overlaps(candidate)) { chosen = candidate; break }
+    }
+    setToastPosition({ left: centerX - width / 2, top: chosen })
   }, [toast])
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(true)
@@ -211,6 +246,8 @@ export function AssistantSettings({ runtime }: SettingsProps) {
     } finally { setSaving(false) }
   }
 
+  const preserveTermCount = countPreserveTerms(form.preserveTerms)
+  const preserveTermOverflow = preserveTermCount > PRESERVE_TERMS_MAX
   const changed = accepted !== null && isSettingsDraftDirty({ accepted, draft: form })
   acceptedRef.current = accepted
   formRef.current = form
@@ -249,10 +286,14 @@ export function AssistantSettings({ runtime }: SettingsProps) {
   }
 
   const resetDefaults = () => {
-    setForm({ ...DEFAULT_CONFIG }); setError(''); showToast(tr('settings.resetDone'), 'info', 2600)
+    setForm({ ...DEFAULT_CONFIG })
+    // A conflict means another window already changed the saved settings. Keep
+    // the conflict message and reload action instead of hiding the only recovery.
+    if (conflict) setError(tr('settings.conflict'))
+    else { setError(''); showToast(tr('settings.resetDone'), 'info', 2600) }
   }
 
-  return <div className="dsh-ia dsh-ia-settings-shell">
+  return <div ref={shellRef} className="dsh-ia dsh-ia-settings-shell">
     <form className="dsh-ia-settings" aria-label={tr('settings.title')} noValidate onSubmit={event => { void save(event) }}>
       <header className="dsh-ia-settings-head">
         <div className="dsh-ia-settings-head-copy">
@@ -318,6 +359,10 @@ export function AssistantSettings({ runtime }: SettingsProps) {
               <textarea aria-label={tr('settings.preserveTerms')} value={form.preserveTerms} maxLength={1000} rows={2}
                 placeholder={tr('settings.preserveTermsPlaceholder')} disabled={!form.optimizeEnabled}
                 onChange={event => change('preserveTerms', event.target.value)} />
+              <small className={`dsh-ia-field-hint${preserveTermOverflow ? ' dsh-ia-field-warn' : ''}`}>
+                {tr('settings.preserveTermsCount', { count: Math.min(preserveTermCount, PRESERVE_TERMS_MAX), max: PRESERVE_TERMS_MAX })}
+              </small>
+              {preserveTermOverflow && <small className="dsh-ia-field-warn" role="alert">{tr('settings.preserveTermsOverflow', { max: PRESERVE_TERMS_MAX })}</small>}
             </label>
           </div>
         </section>
@@ -384,7 +429,7 @@ export function AssistantSettings({ runtime }: SettingsProps) {
         </div>
       </fieldset>
     </form>
-    {toast && createPortal(<div className="dsh-ia-settings-toast-layer" aria-live="polite"><div className={`dsh-ia-settings-toast is-${toast.tone}`} role="status"><span className="dsh-ia-toast-icon" aria-hidden="true">{toast.tone === 'success' ? '✓' : 'i'}</span><span>{toast.text}</span></div></div>, document.body)}
+    {toast && createPortal(<div className="dsh-ia dsh-ia-settings-toast-layer"><div key={toast.id} ref={toastRef} className={`dsh-ia-settings-toast is-${toast.tone}`} role="status" aria-atomic="true" style={toastPosition ? { left: toastPosition.left, top: toastPosition.top } : { left: 0, top: 0, visibility: 'hidden' }}><span className="dsh-ia-toast-icon" aria-hidden="true">{toast.tone === 'success' ? '✓' : 'i'}</span><span>{toast.text}</span></div></div>, document.body)}
     <div className="dsh-ia-settings-footer">
       <button ref={aboutButtonRef} type="button" className="dsh-ia-link" onClick={() => setAboutOpen(true)}>{tr('settings.aboutLink')}<ChevronRight /></button>
     </div>

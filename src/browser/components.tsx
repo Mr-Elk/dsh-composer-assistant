@@ -11,6 +11,7 @@ import { effectiveLanguage, resolveUiLocale, t, type MessageKey } from '../core/
 import { diffText } from '../core/diff'
 import { isSettingsDraftDirty, settingsPatch } from './settings-draft'
 import { errorCopy } from './error-copy'
+import { useDialogFocus } from './dialog-focus'
 import type { AssistantConfig } from '../core/types'
 import type { UsageMetrics } from './controller'
 import { usageCopy, usageFoot, usageRows } from './usage'
@@ -104,21 +105,15 @@ function UsageDialog({ metrics, translate, onClose }: {
   metrics: UsageMetrics; translate: (key: MessageKey, vars?: Record<string, string | number>) => string; onClose: () => void
 }) {
   const closeRef = useRef<HTMLButtonElement>(null)
-  const close = useRef(onClose)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState<'idle' | 'ok' | 'failed'>('idle')
-  close.current = onClose
-  useEffect(() => {
-    closeRef.current?.focus()
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); close.current() } }
-    document.addEventListener('keydown', key, true)
-    return () => document.removeEventListener('keydown', key, true)
-  }, [])
+  useDialogFocus(true, dialogRef, closeRef, onClose)
   const copy = async () => {
     try { await navigator.clipboard.writeText(usageCopy(metrics, translate)); setCopied('ok') }
     catch { setCopied('failed') }
   }
   return createPortal(<div className="dsh-ia dsh-ia-about-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
-    <div className="dsh-ia-about dsh-ia-usage" role="dialog" aria-modal="true" aria-label={translate('usage.title')}>
+    <div ref={dialogRef} className="dsh-ia-about dsh-ia-usage" role="dialog" aria-modal="true" aria-label={translate('usage.title')}>
       <div className="dsh-ia-about-head"><b>{translate('usage.title')}</b>
         <button ref={closeRef} type="button" className="dsh-ia-about-close" aria-label={translate('about.close')} onClick={onClose}>×</button>
       </div>

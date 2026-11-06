@@ -4,12 +4,20 @@ export const PRESERVE_TERMS_MAX = 20
 
 /** Split a free-text glossary into unique terms; separators mirror common Chinese/English lists. */
 export function parsePreserveTerms(raw: string): string[] {
+  return preserveTermCandidates(raw).slice(0, PRESERVE_TERMS_MAX)
+}
+
+/** Count unique terms without the protection cap, for settings feedback. */
+export function countPreserveTerms(raw: string): number {
+  return preserveTermCandidates(raw).length
+}
+
+function preserveTermCandidates(raw: string): string[] {
   if (!raw) return []
   const seen = new Set<string>()
   for (const part of raw.split(/[\n,，、;；]+/)) {
     const term = part.trim()
     if (term) seen.add(term)
-    if (seen.size >= PRESERVE_TERMS_MAX) break
   }
   return [...seen]
 }

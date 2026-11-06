@@ -76,7 +76,10 @@ describe('DSH input assistant settings section', () => {
     const toast = (await screen.findByText('设置已保存')).closest('[role="status"]')
     expect(toast).not.toBeNull()
     expect(toast?.className).toContain('dsh-ia-settings-toast')
+    expect(toast?.getAttribute('aria-atomic')).toBe('true')
     expect(toast?.parentElement?.className).toContain('dsh-ia-settings-toast-layer')
+    expect(toast?.parentElement?.classList.contains('dsh-ia')).toBe(true)
+    expect(toast?.parentElement?.hasAttribute('aria-live')).toBe(false)
   })
 
   it('accepts a one-per-hour automatic limit', async () => {
@@ -100,6 +103,8 @@ describe('DSH input assistant settings section', () => {
       ['建议超时', '020', '20'],
       ['每小时调用上限', '01', '1'],
       ['温度', '00.7', '0.7'],
+      ['每小时调用上限', '000', '0'],
+      ['上下文上限', '-01', '-1'],
     ] as const
     for (const [label, input, expected] of cases) {
       const field = screen.getByLabelText(label) as HTMLInputElement
@@ -247,6 +252,41 @@ describe('DSH input assistant settings section', () => {
     }
   })
 
+  it('keeps the reload action when resetting defaults during a conflict', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.change(screen.getByLabelText('优化强度'), { target: { value: 'deep' } })
+    await f.runtime.saveSettings({ nextEnabled: true })
+    window.dispatchEvent(new Event('focus'))
+    await screen.findByRole('alert')
+    fireEvent.click(screen.getByRole('button', { name: '恢复默认' }))
+    expect(screen.getByRole('alert').textContent).toContain('设置已在其他窗口修改')
+    expect(screen.getByRole('button', { name: '重新加载' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: '保存' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('reports the suggestion timeout range in seconds', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: /高级设置/ }))
+    fireEvent.change(screen.getByLabelText('建议超时'), { target: { value: '70' } })
+    fireEvent.submit(screen.getByRole('form', { name: '输入助手设置' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('5')
+    expect(alert.textContent).toContain('60')
+    expect(alert.textContent).not.toContain('1000')
+    expect(alert.textContent).not.toContain('60000')
+  })
+
+  it('warns when more than twenty protected terms are entered', async () => {
+    settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    const terms = Array.from({ length: 21 }, (_, index) => `term${index}`).join('\n')
+    fireEvent.change(screen.getByLabelText('术语保护'), { target: { value: terms } })
+    expect(screen.getByText('已识别 20/20 个词')).toBeTruthy()
+    expect(screen.getByText('最多保护 20 个词，超出部分不会生效。')).toBeTruthy()
+  })
+
   it('warns instead of overwriting when settings changed elsewhere and the form is dirty', async () => {
     const f = settingsFixture()
     await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
@@ -289,6 +329,16 @@ describe('DSH input assistant settings section', () => {
     expect(screen.getByRole('tooltip').textContent).toContain('控制建议的最大长度')
     fireEvent.click(info)
     expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('keeps Tab focus inside the about dialog', async () => {
+    settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: '关于' }))
+    const copy = await screen.findByRole('button', { name: '复制命令' })
+    copy.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '关闭' }))
   })
 
   it('closes the about dialog with Escape and returns focus', async () => {

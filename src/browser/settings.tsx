@@ -195,7 +195,7 @@ export function AssistantSettings({ runtime }: SettingsProps) {
       const settings = await runtime.saveSettings(patch)
       if (runtime.transport.generation() !== generation) return
       const nextLocale = resolveUiLocale(effectiveLanguage(settings.language), runtime.locale?.() ?? 'zh')
-      setAccepted(settings); setForm(settings); setConflict(false); showToast(t(nextLocale, 'settings.saved'), 'success', 2000)
+      setAccepted(settings); setForm(settings); setConflict(false); showToast(t(nextLocale, 'settings.saved'), 'success', 2600)
       try { sessionStorage.removeItem(SETTINGS_DRAFT_KEY) } catch { /* storage unavailable */ }
     } catch (reason) {
       setError(errorCopy(reason, tr) ?? tr('settings.saveFailedGeneric'))
@@ -240,7 +240,7 @@ export function AssistantSettings({ runtime }: SettingsProps) {
   }
 
   const resetDefaults = () => {
-    setForm({ ...DEFAULT_CONFIG }); setError(''); showToast(tr('settings.resetDone'), 'info', 2500)
+    setForm({ ...DEFAULT_CONFIG }); setError(''); showToast(tr('settings.resetDone'), 'info', 2600)
   }
 
   return <div className="dsh-ia dsh-ia-settings-shell">
@@ -250,7 +250,6 @@ export function AssistantSettings({ runtime }: SettingsProps) {
           <h2>{tr('settings.heading')}</h2>
           <p>{tr('settings.subtitle')}</p>
         </div>
-        {toast && <div className={`dsh-ia-settings-toast is-${toast.tone}`} role="status" aria-live="polite"><span className="dsh-ia-toast-icon" aria-hidden="true">{toast.tone === 'success' ? '✓' : 'i'}</span>{toast.text}</div>}
       </header>
       {loading && <p role="status">{tr('settings.loading')}</p>}
       <fieldset className="dsh-ia-settings-fieldset" disabled={loading || saving || generation === null || !accepted}>
@@ -376,6 +375,7 @@ export function AssistantSettings({ runtime }: SettingsProps) {
         </div>
       </fieldset>
     </form>
+    {toast && createPortal(<div className="dsh-ia-settings-toast-layer" aria-live="polite"><div className={`dsh-ia-settings-toast is-${toast.tone}`} role="status"><span className="dsh-ia-toast-icon" aria-hidden="true">{toast.tone === 'success' ? '✓' : 'i'}</span><span>{toast.text}</span></div></div>, document.body)}
     <div className="dsh-ia-settings-footer">
       <button ref={aboutButtonRef} type="button" className="dsh-ia-link" onClick={() => setAboutOpen(true)}>{tr('settings.aboutLink')}<ChevronRight /></button>
     </div>

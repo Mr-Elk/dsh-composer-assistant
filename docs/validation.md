@@ -177,8 +177,8 @@ Edge 夹具使用生产输入助手界面和控制器、真实 Lexical 编辑器
 | --- | --- |
 | `pnpm install --frozen-lockfile` | 通过 |
 | `pnpm typecheck` | 通过 |
-| `pnpm test`（打包后） | 21 个测试文件，210 条全部通过；含 5 条使用本机 Chrome 的浏览器主题测试 |
-| `pnpm test --no-isolate --maxWorkers=1` | 21 个测试文件，210 条全部通过 |
+| `pnpm test`（打包后） | 21 个测试文件，211 条全部通过；含 5 条使用本机 Chrome 的浏览器主题测试 |
+| `pnpm test --no-isolate --maxWorkers=1` | 21 个测试文件，211 条全部通过 |
 | `pnpm build` | 通过 |
 | `pnpm pack --pack-destination dist` | 生成本地 `dsh-composer-assistant-0.4.0.tgz`；未发布 |
 | `pnpm test:package` | 通过；压缩包包含双语 README、客户端入口和宿主入口，并校验默认关闭/10 次额度 |

@@ -68,6 +68,17 @@ describe('DSH input assistant settings section', () => {
     expect(f.setters).toHaveLength(0)
   })
 
+  it('shows the saved confirmation in a centered status layer', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.change(screen.getByLabelText('优化强度'), { target: { value: 'deep' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    const toast = (await screen.findByText('设置已保存')).closest('[role="status"]')
+    expect(toast).not.toBeNull()
+    expect(toast?.className).toContain('dsh-ia-settings-toast')
+    expect(toast?.parentElement?.className).toContain('dsh-ia-settings-toast-layer')
+  })
+
   it('does not overwrite another switch changed after the settings page was opened', async () => {
     const f = settingsFixture()
     await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())

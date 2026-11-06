@@ -10,7 +10,7 @@ The current npm release is still `0.3.0`; `0.4.0` has not been published.
 
 - **Automatic suggestions are opt-in for new installs:** next-message prediction and draft completion start disabled; manual optimization stays available. Automatic calls default to 10 per hour. Existing saved switches and limits are preserved.
 - **The budget survives restarts:** the merged storage fix persists a reservation before the model call and refuses automatic calls when storage fails.
-- **Streaming suggestions:** ghost text appears while the host is still generating. The final result remains authoritative.
+- **Streaming suggestions (experimental):** ghost text appears while the host is still generating. This is experimental and is not a 0.4.0 release gate; keep or default it based on real latency data later.
 - **Session request stats:** the settings popover shows request count and average request time, with accept rate and post-accept edits. It counts requests, not model calls or billing.
 - **Glossary protection:** list terms in Settings that optimization must keep verbatim.
 - **0.3.0 capabilities remain:** Chinese/English switching, the redesigned settings page, localized errors, and settings-draft recovery.
@@ -135,7 +135,8 @@ The package metadata declares DSH compatibility as `>=0.2.1-rc.2 <0.3.0-0` and e
 `0.4.0` is not published yet. Automated checks and package verification for this branch are recorded in [docs/validation.md](docs/validation.md). The English release summary is in [CHANGELOG.en.md](CHANGELOG.en.md). A full DSH Desktop quit/restart with a real model call, a real Edge window, and a real Chinese IME remain unverified.
 
 - Ghost text is limited to the visible editor area; longer suggestions use a candidate card.
-- Streaming applies only to ghost text; candidate cards and long suggestions still appear at once.
+- Streaming applies only to ghost text and is experimental; candidate cards and long suggestions still appear at once.
+- Streaming is not part of 0.4.0 desktop acceptance; the release gate covers budget persistence, request stats, and glossary protection.
 - Request stats cover the current session only and reset on reload. The count includes failed, cancelled, and budget-blocked requests; it is not a model-call count or a bill.
 - The automatic-call budget lives in local plugin storage and depends on the system clock. It cannot recover calls made before the persistent version, and is lost if plugin data is deleted or the configuration directory changes. It does not coordinate multiple independent DSH processes and is not an account-level spending cap.
 - A saved automatic-call reservation is not refunded when the request is cancelled, times out, or fails. Manual optimization and “Regenerate” are neither counted nor blocked by the limit.

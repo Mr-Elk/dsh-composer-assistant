@@ -6,7 +6,7 @@ This is the English summary. The Chinese [CHANGELOG.md](CHANGELOG.md) remains th
 
 ### Added
 
-- Streaming suggestions: ghost text appears while the host is still generating; the final result remains authoritative.
+- Streaming suggestions (experimental): ghost text appears while the host is still generating; the final result remains authoritative. This is not a 0.4.0 release gate.
 - Session request stats: request count, average request time, shown/accepted suggestions, accept rate, and edits after acceptance, with copy support.
 - Glossary protection: up to 20 unique terms can be kept verbatim during optimization.
 

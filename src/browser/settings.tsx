@@ -244,7 +244,7 @@ export function AssistantSettings({ runtime }: SettingsProps) {
   }
 
   return <div className="dsh-ia dsh-ia-settings-shell">
-    <form className="dsh-ia-settings" aria-label={tr('settings.title')} onSubmit={event => { void save(event) }}>
+    <form className="dsh-ia-settings" aria-label={tr('settings.title')} noValidate onSubmit={event => { void save(event) }}>
       <header className="dsh-ia-settings-head">
         <div className="dsh-ia-settings-head-copy">
           <h2>{tr('settings.heading')}</h2>
@@ -351,7 +351,7 @@ export function AssistantSettings({ runtime }: SettingsProps) {
                 onChange={event => change('suggestionTimeoutMs', Number(event.target.value) * 1000)} />
             </Row>
             <Row helpLabel={tr('common.help')} title={tr('settings.hourly')} hint={tr('settings.hint.hourly')} hintLabel={tr('settings.hourly')}>
-              <input type="number" aria-label={tr('settings.hourly')} value={form.hourlyCallLimit} min={0} max={2000} step={10}
+              <input type="number" aria-label={tr('settings.hourly')} value={form.hourlyCallLimit} min={0} max={2000} step={1} inputMode="numeric"
                 onChange={event => change('hourlyCallLimit', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
             </Row>
             <Row helpLabel={tr('common.help')} title={tr('settings.temperature')} hint={tr('settings.hint.temperature')} hintLabel={tr('settings.temperature')}>

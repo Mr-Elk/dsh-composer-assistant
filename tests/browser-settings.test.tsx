@@ -79,6 +79,18 @@ describe('DSH input assistant settings section', () => {
     expect(toast?.parentElement?.className).toContain('dsh-ia-settings-toast-layer')
   })
 
+  it('accepts a one-per-hour automatic limit', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: /高级设置/ }))
+    const input = screen.getByLabelText('每小时调用上限') as HTMLInputElement
+    expect(input.step).toBe('1')
+    fireEvent.change(input, { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(f.setters).toHaveLength(1))
+    expect(f.setters[0]).toEqual({ hourlyCallLimit: 1 })
+  })
+
   it('does not overwrite another switch changed after the settings page was opened', async () => {
     const f = settingsFixture()
     await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())

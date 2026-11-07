@@ -116,7 +116,7 @@ Setting the limit to 20 means that, across all conversations under the same DSH 
 
 The plugin persists a reservation before it dispatches the model call. Once saved, the reservation still counts if the request is cancelled, times out, or the model fails. If saving the reservation fails, the automatic request stops without consuming budget. If the budget record cannot be read or is corrupt, automatic suggestions stop rather than treating the state as a fresh allowance; they can resume after storage recovers. Manual actions remain available but still require normal settings storage and a working model connection. A limit of `0` means unlimited calls, but automatic calls are still recorded.
 
-The budget depends on locally stored data and the system clock. The first upgrade to the persistent version cannot backfill calls made by older versions. Deleting data, changing the configuration directory, or rolling back to an older version removes this protection. The total is not guaranteed when multiple independent DSH processes write the same storage, and it is not a spending cap for the whole model account. Validation covered the real plugin, the official file-storage backend, and a separate Node process reopening the store; a full DSH Desktop quit-and-restart model call has not yet been tested.
+The budget depends on locally stored data and the system clock. The first upgrade to the persistent version cannot backfill calls made by older versions. Deleting data, changing the configuration directory, or rolling back to an older version removes this protection. The total is not guaranteed when multiple independent DSH processes write the same storage, and it is not a spending cap for the whole model account. Validation covered the real plugin, the official file-storage backend, a separate Node process reopening the store, and a DSH Desktop quit-and-restart at limit 1: after restart the same draft produced no automatic suggestion and manual optimization still worked.
 
 ## Model costs and privacy
 
@@ -132,11 +132,11 @@ The budget depends on locally stored data and the system clock. The first upgrad
 
 The package metadata declares DSH compatibility as `>=0.2.1-rc.2 <0.3.0-0` and explicitly lists compatibility records for `0.2.1-rc.3` and `0.2.1-rc.5`. Automated tests, browser fixtures, and an isolated npm install do not establish full compatibility with a live DSH Desktop environment.
 
-`0.4.0` is not published yet. Automated checks and package verification for this branch are recorded in [docs/validation.md](docs/validation.md). The English release summary is in [CHANGELOG.en.md](CHANGELOG.en.md). A full DSH Desktop quit/restart with a real model call, a real Edge window, and a real Chinese IME remain unverified.
+`0.4.0` is not published yet. Automated checks and package verification for this branch are recorded in [docs/validation.md](docs/validation.md). The English release summary is in [CHANGELOG.en.md](CHANGELOG.en.md). A DSH Desktop quit/restart at limit 1 is verified; a real Edge window and a real Chinese IME remain unverified.
 
 - Ghost text is limited to the visible editor area; longer suggestions use a candidate card.
 - Streaming applies only to ghost text and is experimental; candidate cards and long suggestions still appear at once.
-- Streaming is not part of 0.4.0 desktop acceptance; the release gate covers budget persistence, request stats, and glossary protection.
+- Streaming is not part of 0.4.0 desktop acceptance; budget persistence, request stats, and glossary protection have passed on DSH Desktop.
 - Request stats cover the current session only and reset on reload. The count includes failed, cancelled, and budget-blocked requests; it is not a model-call count or a bill.
 - The automatic-call budget lives in local plugin storage and depends on the system clock. It cannot recover calls made before the persistent version, and is lost if plugin data is deleted or the configuration directory changes. It does not coordinate multiple independent DSH processes and is not an account-level spending cap.
 - A saved automatic-call reservation is not refunded when the request is cancelled, times out, or fails. Manual optimization and “Regenerate” are neither counted nor blocked by the limit.

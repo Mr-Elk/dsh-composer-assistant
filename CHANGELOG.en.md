@@ -2,7 +2,9 @@
 
 This is the English summary. The Chinese [CHANGELOG.md](CHANGELOG.md) remains the detailed record.
 
-## [0.4.0] - unreleased
+## [0.4.0] - 2026-11-07
+
+GitHub pre-release for a one-day validation; npm still serves `0.3.0`.
 
 ### Added
 

@@ -4,9 +4,9 @@
 
 Predict the next message, continue a draft, or polish a prompt in the DeepSeek Harness (DSH) composer. The plugin offers editable text only: press `Tab` to accept or `Esc` to dismiss. It never sends a message for you.
 
-The current npm release is still `0.3.0`; `0.4.0` has not been published.
+The current npm release is still `0.3.0`. GitHub has a `v0.4.0` pre-release for a one-day validation before npm is updated.
 
-## What changes in 0.4.0 (unreleased)
+## What changed in 0.4.0
 
 - **Automatic suggestions are opt-in for new installs:** next-message prediction and draft completion start disabled; manual optimization stays available. Automatic calls default to 10 per hour. Existing saved switches and limits are preserved.
 - **The budget survives restarts:** the merged storage fix persists a reservation before the model call and refuses automatic calls when storage fails.
@@ -67,7 +67,7 @@ That command affects only the web profile; it does not mean the desktop plugin i
 
 To upgrade: DSH sidebar → Plugins → select `dsh-composer-assistant` → update to the target version, then fully quit and reopen DSH. DSH does not automatically update third-party plugins.
 
-To roll back, install a known-good version or local package from the plugin page if the current DSH version provides a local install entry. Keep a known-good `.tgz` before upgrading. Until `0.4.0` is published, npm still serves `0.3.0`.
+To roll back, install a known-good version or local package from the plugin page if the current DSH version provides a local install entry. Keep a known-good `.tgz` before upgrading. `0.4.0` is not on npm yet; during validation, install the `.tgz` attached to the GitHub Release. npm still serves `0.3.0`.
 
 ## Installation troubleshooting
 
@@ -132,7 +132,7 @@ The budget depends on locally stored data and the system clock. The first upgrad
 
 The package metadata declares DSH compatibility as `>=0.2.1-rc.2 <0.3.0-0` and explicitly lists compatibility records for `0.2.1-rc.3` and `0.2.1-rc.5`. Automated tests, browser fixtures, and an isolated npm install do not establish full compatibility with a live DSH Desktop environment.
 
-`0.4.0` is not published yet. Automated checks and package verification for this branch are recorded in [docs/validation.md](docs/validation.md). The English release summary is in [CHANGELOG.en.md](CHANGELOG.en.md). A DSH Desktop quit/restart at limit 1 is verified; a real Edge window and a real Chinese IME remain unverified.
+`0.4.0` is not on npm yet; a GitHub pre-release is available while it is validated. Automated checks and package verification for this branch are recorded in [docs/validation.md](docs/validation.md). The English release summary is in [CHANGELOG.en.md](CHANGELOG.en.md). A DSH Desktop quit/restart at limit 1 is verified; a real Edge window and a real Chinese IME remain unverified.
 
 - Ghost text is limited to the visible editor area; longer suggestions use a candidate card.
 - Streaming applies only to ghost text and is experimental; candidate cards and long suggestions still appear at once.

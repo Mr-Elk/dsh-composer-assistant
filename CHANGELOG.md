@@ -2,7 +2,9 @@
 
 本文件记录面向用户的变更。完整的技术修正记录见 [`docs/CHANGELOG-0.1.2.md`](docs/CHANGELOG-0.1.2.md)。英文摘要见 [`CHANGELOG.en.md`](CHANGELOG.en.md)。
 
-## [0.4.0] - 未发布
+## [0.4.0] - 2026-11-07
+
+GitHub 预发布，先验证一天；npm 仍为 `0.3.0`。
 
 ### 发布范围与默认值
 

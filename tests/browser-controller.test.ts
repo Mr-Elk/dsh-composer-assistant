@@ -23,6 +23,7 @@ function fixture(text = '请改善这段说明', automatic = false, locale?: () 
   let delayedStatus: ReturnType<typeof deferred<AssistantStatus>> | null = null
   const pending: { request: GenerationRequest; signal?: AbortSignal; task: ReturnType<typeof deferred<GenerationResult>> }[] = []
   const calls: { method: string; data: unknown }[] = []
+  let partialText: string | null = null
   const insertText = vi.fn((value: string, target: TokenSpan) => {
     if (target.draftRev !== binding.input.draftRev) return false
     const next = binding.input.draft.slice(0, target.start) + value + binding.input.draft.slice(target.end)
@@ -41,6 +42,7 @@ function fixture(text = '请改善这段说明', automatic = false, locale?: () 
         if (generateError) { const error = generateError; generateError = null; throw error }
         const task = deferred<GenerationResult>(); pending.push({ request: data as GenerationRequest, signal, task }); return task.promise as Promise<T>
       }
+      if (method === 'generate/partial') return (partialText === null ? null : { text: partialText }) as T
       if (method === 'cancel') return {} as T
       if (method === 'settings/set') { status = { ...status, settings: { ...status.settings, ...data as object } }; return status.settings as T }
       throw new Error(`Unexpected ${method}`)
@@ -67,6 +69,7 @@ function fixture(text = '请改善这段说明', automatic = false, locale?: () 
     get binding() { return binding },
     setStatus: (change: Partial<AssistantStatus>) => { status = { ...status, ...change } },
     setGeneration: (value: string | null) => { generation = value; controller.bind(binding) },
+    setPartial: (text: string | null) => { partialText = text },
     setAttachments: () => { binding = { ...binding, input: { ...binding.input, attachmentIds: ['image'] } }; controller.bind(binding) },
     setReferences: () => { binding = { ...binding, input: { ...binding.input, occurrences: [{ offset: 0, length: 4 }] } }; controller.bind(binding) },
     failStatusOnce: () => { statusFailure = true },
@@ -95,6 +98,59 @@ describe('browser editor transactions', () => {
     // The regenerated turn is already marked, so polling must not request again.
     expect(f.pending).toHaveLength(2)
   })
+  it('shows streamed partials until the final suggestion replaces them', async () => {
+    vi.useFakeTimers()
+    const f = fixture('请改善这段说明', true)
+    await f.controller.refresh()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(f.pending).toHaveLength(1)
+    f.setPartial('请改善')
+    await vi.advanceTimersByTimeAsync(120)
+    expect(f.controller.getSnapshot().streaming).toMatchObject({ text: '请改善' })
+    expect(f.controller.getSnapshot().suggestion).toBeNull()
+    expect(f.controller.acceptSuggestion()).toBe(false)
+    f.setPartial('请改善这段说明的措辞')
+    await vi.advanceTimersByTimeAsync(120)
+    expect(f.controller.getSnapshot().streaming).toMatchObject({ text: '请改善这段说明的措辞' })
+    f.resolve(0, '请把这段说明写清楚。')
+    await flush()
+    expect(f.controller.getSnapshot().streaming).toBeNull()
+    expect(f.controller.getSnapshot().suggestion?.text).toBe('请把这段说明写清楚。')
+  })
+
+  it('keeps a newer stream alive when an older attempt settles late', async () => {
+    vi.useFakeTimers()
+    const f = fixture('请改善这段说明', true)
+    await f.controller.refresh()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(f.pending).toHaveLength(1)
+    // Editing cancels the first attempt and arms a fresh completion request.
+    f.update('请改善这段说明的格式')
+    // The second completion also waits out the 2s minimum request interval.
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(f.pending).toHaveLength(2)
+    f.setPartial('第二版的半成品')
+    await vi.advanceTimersByTimeAsync(120)
+    expect(f.controller.getSnapshot().streaming).toMatchObject({ text: '第二版的半成品' })
+    f.pending[0].task.reject(new Error('stale attempt'))
+    await flush()
+    expect(f.controller.getSnapshot().streaming).toMatchObject({ text: '第二版的半成品' })
+    f.resolve(1, '请把格式统一。')
+    await flush()
+    expect(f.controller.getSnapshot().streaming).toBeNull()
+  })
+
+  it('does not poll partials for a manual optimization', async () => {
+    vi.useFakeTimers()
+    const f = fixture('原稿')
+    await f.controller.refresh()
+    const task = f.controller.optimize()
+    await vi.advanceTimersByTimeAsync(400)
+    expect(f.calls.some(call => call.method === 'generate/partial')).toBe(false)
+    f.resolve(0, '请说明改动原因。')
+    await task
+  })
+
   it('auto-hides info notices and keeps error notices longer', async () => {
     vi.useFakeTimers()
     const f = fixture()
@@ -146,7 +202,7 @@ describe('browser editor transactions', () => {
   })
   it('keeps UTF-16 insertion offsets while counting emoji budgets as Unicode characters', async () => {
     vi.useFakeTimers(); const text = '😀'.repeat(100), f = fixture(text, true)
-    f.setStatus({ settings: { ...DEFAULT_CONFIG, maxDraftChars: 100 } }); await f.controller.refresh()
+    f.setStatus({ settings: { ...DEFAULT_CONFIG, nextEnabled: true, completionEnabled: true, maxDraftChars: 100 } }); await f.controller.refresh()
     await vi.advanceTimersByTimeAsync(600)
     expect(f.pending[0].request.operation).toBe('complete')
     expect(f.pending[0].request.span.end).toBe(200)
@@ -327,7 +383,7 @@ describe('shared suggestion scheduling', () => {
     f.pending[0].task.reject(new Error('提供商错误')); await flush()
     await f.controller.refresh(); await vi.advanceTimersByTimeAsync(3000)
     expect(f.pending).toHaveLength(1)
-    f.setStatus({ settings: { ...DEFAULT_CONFIG, debounceMs: 700 } }); await f.controller.refresh(); await vi.advanceTimersByTimeAsync(2000)
+    f.setStatus({ settings: { ...DEFAULT_CONFIG, nextEnabled: true, completionEnabled: true, debounceMs: 700 } }); await f.controller.refresh(); await vi.advanceTimersByTimeAsync(2000)
     expect(f.pending).toHaveLength(2)
     f.resolve(1, null); await flush()
   })

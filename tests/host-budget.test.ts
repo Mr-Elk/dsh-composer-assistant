@@ -33,7 +33,8 @@ function deferred() {
 
 // Gates delay real operations; all services and records use official storage.
 // Read/write failures below are actual filesystem errors, not a fake backend.
-async function fixture(limit = 1, existingDirectory?: string) {
+async function fixture(limit = 1, existingDirectory?: string,
+  config: plugin.Config = { nextEnabled: true, completionEnabled: true, hourlyCallLimit: limit }) {
   const directory = existingDirectory ?? await mkdtemp(join(tmpdir(), 'dsh-budget-'))
   const budgetPath = join(directory, 'input_assistant_budget.json')
   const ctx = new Context()
@@ -68,7 +69,7 @@ async function fixture(limit = 1, existingDirectory?: string) {
     }
     return unit
   })
-  const fiber = ctx.plugin(plugin, { hourlyCallLimit: limit })
+  const fiber = ctx.plugin(plugin, config)
   await fiber.await()
   const provider = vi.spyOn(ctx.llm, 'prepareCall') // Call through to the real runtime.
   const call = async <T>(method: string, data: unknown): Promise<T> => await gateway.invoke({
@@ -117,6 +118,36 @@ async function attempt(f: Awaited<ReturnType<typeof fixture>>, input?: Generatio
 }
 
 describe('automatic budget through the real plugin, Host, Domain and JSON backend', () => {
+  it('starts with automatic suggestions off and a finite budget, leaving manual optimization available', async () => {
+    const f = await fixture(1, undefined, {})
+    expect(await f.call('settings/get', {})).toMatchObject({
+      optimizeEnabled: true, nextEnabled: false, completionEnabled: false, hourlyCallLimit: 10,
+    })
+    expect(await f.generate(await f.request())).toMatchObject({ text: null })
+    expect(f.provider).not.toHaveBeenCalled()
+    await expect(readFile(f.budgetPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    await attempt(f, { ...await f.request(), operation: 'optimize' })
+    expect(f.provider).toHaveBeenCalledTimes(1)
+    await expect(readFile(f.budgetPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    await f.call('settings/set', { completionEnabled: true })
+    await attempt(f)
+    expect(f.provider).toHaveBeenCalledTimes(2)
+    expect(await f.stored()).toHaveLength(1)
+  })
+
+  it('preserves existing opt-in and unlimited settings when reopening with the new defaults', async () => {
+    const before = await fixture()
+    await before.call('settings/set', { nextEnabled: true, completionEnabled: true, hourlyCallLimit: 0 })
+    await attempt(before)
+    await before.stop()
+    const after = await fixture(1, before.directory, {})
+    expect(await after.call('settings/get', {})).toMatchObject({
+      nextEnabled: true, completionEnabled: true, hourlyCallLimit: 0,
+    })
+    await attempt(after)
+    expect(await after.stored()).toHaveLength(2)
+  })
+
   it('shares the first asynchronous open and preserves exhausted history under concurrency', async () => {
     const f = await fixture()
     await f.seed([Date.now()])
@@ -310,7 +341,7 @@ describe('automatic budget through the real plugin, Host, Domain and JSON backen
 
   it('times out a storage wait without a late call after persistence completes', async () => {
     const f = await fixture()
-    await f.call('settings/set', { suggestionTimeoutMs: 1000 })
+    await f.call('settings/set', { suggestionTimeoutMs: 5000 })
     const entered = deferred(), release = deferred()
     f.hooks.beforeWrite = async () => { entered.resolve(); await release.promise }
     const pending = expect(f.generate(await f.request())).rejects.toMatchObject({ details: { code: 'TIMEOUT' } })
@@ -327,7 +358,7 @@ describe('automatic budget through the real plugin, Host, Domain and JSON backen
     expect(spec.version).toBe(1)
     expect(Object.keys(spec.tables)).toEqual(['drafts'])
     const old = await f.facility.open(spec)
-    await old.global.set({ version: 1, settings: { ...DEFAULT_CONFIG, hourlyCallLimit: 1, language: 'en' } })
+    await old.global.set({ version: 1, settings: { ...DEFAULT_CONFIG, nextEnabled: true, completionEnabled: true, hourlyCallLimit: 1, language: 'en' } })
     await old.table('drafts').put('legacy', { version: 1, drafts: [{ id: 'saved', text: '保留的草稿', createdAt: Date.now() }] })
     await old.close()
     const settingsPath = join(f.directory, 'input_assistant', 'global.json')

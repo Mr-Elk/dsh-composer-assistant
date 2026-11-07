@@ -11,6 +11,10 @@ import { emptyTranscript } from './transcript'
 import type { RpcPayload } from './rpc'
 
 const stringId = z.string().min(1).max(300)
+/** Wire cap for streamed partials; the final result is authoritative and uncapped. */
+const PARTIAL_MAX_CHARS = 8_000
+const PARTIAL_TTL_MS = 120_000
+const partialRequest = z.object({ sessionId: stringId, requestId: stringId })
 const sessionRequest = z.object({ sessionId: stringId })
 const generationRequest: z.ZodType<GenerationRequest> = z.object({
   requestId: stringId, sessionId: stringId, operation: z.enum(['optimize', 'next', 'complete']),
@@ -28,6 +32,8 @@ export class AssistantHostRuntime {
   private readonly mount = randomUUID()
   private readonly instances = new WeakMap<Session, SessionRuntime>()
   private readonly scheduler = new SessionScheduler()
+  /** Streamed text for the active request, read by polling; never persisted. */
+  private readonly partials = new Map<string, { sessionId: string; text: string; at: number }>()
   private disposed = false
   constructor(private readonly ctx: Context, private readonly storage: AssistantStorage,
     private readonly budget: AutomaticCallBudget) {}
@@ -167,9 +173,15 @@ export class AssistantHostRuntime {
         messages: [{ role: 'user', content: [{ type: 'text', text: prepared.input }] }],
         tools: [], sessionId: session.id, signal: active,
       }
+      let streamed = ''
       for await (const chunk of call.stream(options)) {
         active.throwIfAborted()
         if (chunk.type === 'tool-call-delta') throw new AssistantError('OUTPUT', '辅助模型返回工具调用，已保留原稿')
+        if (chunk.type === 'text-delta') {
+          streamed += chunk.text
+          // Manual optimization never polls; keep its draft out of the partial buffer.
+          if (request.operation !== 'optimize') this.setPartial(request.requestId, session.id, streamed)
+        }
         assembler.push(chunk)
       }
       active.throwIfAborted()
@@ -178,19 +190,48 @@ export class AssistantHostRuntime {
       if (blocks.some(block => block.type !== 'text' && block.type !== 'reasoning')) throw new AssistantError('OUTPUT', '辅助模型返回了非文本内容')
       const raw = blocks.filter(block => block.type === 'text').map(block => block.text).join('')
       return finishGeneration(raw, prepared)
-    }, signal)
+    }, signal).finally(() => { this.partials.delete(request.requestId) })
     this.current(request, session)
     return this.result(request, text)
   }
 
-  cancel(id: string, requestId?: string): boolean { return this.scheduler.cancel(id, requestId) }
-  changed(session: Session): void { this.scheduler.cancel(session.id) }
-  dispose(): void { this.disposed = true; this.scheduler.dispose() }
+  cancel(id: string, requestId?: string): boolean {
+    if (requestId) this.partials.delete(requestId)
+    return this.scheduler.cancel(id, requestId)
+  }
+  changed(session: Session): void {
+    for (const [key, value] of this.partials) if (value.sessionId === session.id) this.partials.delete(key)
+    this.scheduler.cancel(session.id)
+  }
+  dispose(): void { this.disposed = true; this.partials.clear(); this.scheduler.dispose() }
+
+  /** Bounded, short-lived streamed text; polling readers only see their own session. */
+  private setPartial(requestId: string, sessionId: string, text: string): void {
+    if (this.disposed) return
+    const now = Date.now()
+    if (this.partials.size >= 32) {
+      for (const [key, value] of this.partials) if (now - value.at > PARTIAL_TTL_MS) this.partials.delete(key)
+    }
+    this.partials.set(requestId, {
+      sessionId, at: now,
+      text: text.length > PARTIAL_MAX_CHARS ? text.slice(0, PARTIAL_MAX_CHARS) : text,
+    })
+  }
+
+  private readPartial(input: unknown): { text: string } | null {
+    const parsed = partialRequest.safeParse(input)
+    if (!parsed.success) throw new AssistantError('INPUT', '读取参数无效')
+    const entry = this.partials.get(parsed.data.requestId)
+    if (!entry || entry.sessionId !== parsed.data.sessionId) return null
+    if (Date.now() - entry.at > PARTIAL_TTL_MS) { this.partials.delete(parsed.data.requestId); return null }
+    return { text: entry.text }
+  }
 
   async invoke(payload: RpcPayload, signal: AbortSignal): Promise<unknown> {
     signal.throwIfAborted()
     switch (payload.method) {
       case 'generate': return this.generate(payload.data, signal)
+      case 'generate/partial': return this.readPartial(payload.data)
       case 'settings/get': return this.storage.settings()
       case 'settings/set': {
         const patch = z.record(z.string(), z.unknown()).parse(payload.data) as Partial<AssistantConfig>

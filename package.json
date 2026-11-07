@@ -1,6 +1,6 @@
 {
   "name": "dsh-composer-assistant",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "DSH 输入助手：下一句预测、输入续写、提示词优化（dsh-input-assistant 的增强 fork）",
   "type": "module",
   "license": "MIT",

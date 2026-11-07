@@ -1,13 +1,15 @@
-import { type FormEvent, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { resolveConfig } from '../core/config'
+import { countPreserveTerms, PRESERVE_TERMS_MAX } from '../core/protection'
 import { DEFAULT_CONFIG, type AssistantConfig, type ModelCatalog, type ModelOption } from '../core/types'
 import { PLUGIN_VERSION } from '../core/version'
 import { LANGUAGE_SELECTION_ENABLED, effectiveLanguage, resolveUiLocale, t, type MessageKey } from '../core/i18n'
 import { isSettingsDraftDirty, settingsPatch } from './settings-draft'
 import { InfoTip } from './info-tip'
+import { useDialogFocus } from './dialog-focus'
 import { errorCopy } from './error-copy'
 import type { BrowserRuntime } from './runtime'
 import type { UsageMetrics } from './controller'
@@ -16,6 +18,15 @@ type SettingsProps = PropsRuntime<'settings.section'> & { runtime: BrowserRuntim
 const SETTINGS_DRAFT_KEY = 'dsh.input-assistant.settings-draft.v1'
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string
 type ToastState = { text: string; tone: 'success' | 'info'; ttl: number; id: number }
+/** Normalize numeric input while typing: strip leading zeros, keep decimals and sign. */
+function readNumberInput(event: ChangeEvent<HTMLInputElement>): number {
+  const input = event.currentTarget
+  const raw = input.value
+  const normalized = raw.replace(/^(-?)0+(?=\d)/, '$1')
+  if (normalized !== raw) input.value = normalized
+  return normalized === '' ? Number.NaN : Number(normalized)
+}
+
 
 function Chevron({ up = false }: { up?: boolean }) {
   return <svg className="dsh-ia-chevron" aria-hidden="true" viewBox="0 0 16 16" width="12" height="12" fill="none">
@@ -42,25 +53,18 @@ function AboutDialog({ open, onClose, translate }: {
   open: boolean; onClose: () => void; translate: Translate
 }) {
   const closeRef = useRef<HTMLButtonElement>(null)
-  const close = useRef(onClose)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState<'idle' | 'ok' | 'failed'>('idle')
-  close.current = onClose
-  useEffect(() => {
-    if (!open) return
-    closeRef.current?.focus()
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); close.current() } }
-    document.addEventListener('keydown', key, true)
-    return () => document.removeEventListener('keydown', key, true)
-  }, [open])
+  useDialogFocus(open, dialogRef, closeRef, onClose)
   useEffect(() => { if (!open) setCopied('idle') }, [open])
   if (!open) return null
-  const command = 'dsh plugin --profile desktop add dsh-composer-assistant'
+  const packageName = 'dsh-composer-assistant'
   const copy = async () => {
-    try { await navigator.clipboard.writeText(command); setCopied('ok') }
+    try { await navigator.clipboard.writeText(packageName); setCopied('ok') }
     catch { setCopied('failed') }
   }
   return createPortal(<div className="dsh-ia dsh-ia-about-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose() }}>
-    <div className="dsh-ia-about" role="dialog" aria-modal="true" aria-label={translate('about.title')}>
+    <div ref={dialogRef} className="dsh-ia-about" role="dialog" aria-modal="true" aria-label={translate('about.title')}>
       <div className="dsh-ia-about-head"><b>{translate('about.title')}</b>
         <button ref={closeRef} type="button" className="dsh-ia-about-close" aria-label={translate('about.close')} onClick={onClose}>×</button>
       </div>
@@ -69,8 +73,8 @@ function AboutDialog({ open, onClose, translate }: {
         <span className="dsh-ia-about-label">{translate('about.upgrade')}</span>
         <p className="dsh-ia-about-hint">{translate('about.upgradeHint')}</p>
         <div className="dsh-ia-about-command">
-          <code>{command}</code>
-          <button type="button" onClick={() => { void copy() }}>{copied === 'ok' ? translate('about.copied') : translate('about.copy')}</button>
+          <code>{packageName}</code>
+          <button type="button" onClick={() => { void copy() }}>{copied === 'ok' ? translate('about.copied') : translate('about.copyPackage')}</button>
         </div>
         <p className="dsh-ia-about-note" role="status">{copied === 'failed' ? translate('about.copyFailed') : translate('about.restartNote')}</p>
       </div>
@@ -90,13 +94,53 @@ export function AssistantSettings({ runtime }: SettingsProps) {
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
   const toastSequence = useRef(0)
+  const shellRef = useRef<HTMLDivElement>(null)
+  const toastRef = useRef<HTMLDivElement>(null)
+  const [toastPosition, setToastPosition] = useState<{ left: number; top: number } | null>(null)
   const showToast = (text: string, tone: ToastState['tone'] = 'success', ttl = 2000) => {
+    setToastPosition(null)
     setToast({ text, tone, ttl, id: ++toastSequence.current })
   }
   useEffect(() => {
     if (!toast) return
     const timer = setTimeout(() => setToast(null), toast.ttl)
     return () => clearTimeout(timer)
+  }, [toast])
+
+  // Center inside the settings surface's visible area, then move to the nearest
+  // gap if the compact pill would cover an input, select or textarea.
+  useLayoutEffect(() => {
+    if (!toast) { setToastPosition(null); return }
+    const shell = shellRef.current, node = toastRef.current
+    if (!shell || !node) return
+    const shellRect = shell.getBoundingClientRect()
+    const left = Math.max(0, shellRect.left)
+    const top = Math.max(0, shellRect.top)
+    const right = Math.min(window.innerWidth, shellRect.right)
+    const bottom = Math.min(window.innerHeight, shellRect.bottom)
+    if (right <= left || bottom <= top) return
+    const rect = node.getBoundingClientRect()
+    const width = rect.width, height = rect.height
+    const centerX = (left + right) / 2
+    const centerY = (top + bottom) / 2
+    const controls = [...shell.querySelectorAll<HTMLElement>('input, select, textarea')]
+    const overlaps = (candidateTop: number) => controls.some(control => {
+      const r = control.getBoundingClientRect()
+      if (!r.width && !r.height) return false
+      return !(centerX + width / 2 <= r.left || centerX - width / 2 >= r.right
+        || candidateTop + height <= r.top || candidateTop >= r.bottom)
+    })
+    const minTop = top + 8
+    const maxTop = Math.max(minTop, bottom - height - 8)
+    const base = centerY - height / 2
+    const offsets = [0]
+    for (let step = 1; step <= 4; step += 1) offsets.push(-step * (height + 12), step * (height + 12))
+    let chosen = Math.min(Math.max(base, minTop), maxTop)
+    for (const offset of offsets) {
+      const candidate = Math.min(Math.max(base + offset, minTop), maxTop)
+      if (!overlaps(candidate)) { chosen = candidate; break }
+    }
+    setToastPosition({ left: centerX - width / 2, top: chosen })
   }, [toast])
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(true)
@@ -195,13 +239,15 @@ export function AssistantSettings({ runtime }: SettingsProps) {
       const settings = await runtime.saveSettings(patch)
       if (runtime.transport.generation() !== generation) return
       const nextLocale = resolveUiLocale(effectiveLanguage(settings.language), runtime.locale?.() ?? 'zh')
-      setAccepted(settings); setForm(settings); setConflict(false); showToast(t(nextLocale, 'settings.saved'), 'success', 2000)
+      setAccepted(settings); setForm(settings); setConflict(false); showToast(t(nextLocale, 'settings.saved'), 'success', 2600)
       try { sessionStorage.removeItem(SETTINGS_DRAFT_KEY) } catch { /* storage unavailable */ }
     } catch (reason) {
       setError(errorCopy(reason, tr) ?? tr('settings.saveFailedGeneric'))
     } finally { setSaving(false) }
   }
 
+  const preserveTermCount = countPreserveTerms(form.preserveTerms)
+  const preserveTermOverflow = preserveTermCount > PRESERVE_TERMS_MAX
   const changed = accepted !== null && isSettingsDraftDirty({ accepted, draft: form })
   acceptedRef.current = accepted
   formRef.current = form
@@ -240,17 +286,20 @@ export function AssistantSettings({ runtime }: SettingsProps) {
   }
 
   const resetDefaults = () => {
-    setForm({ ...DEFAULT_CONFIG }); setError(''); showToast(tr('settings.resetDone'), 'info', 2500)
+    setForm({ ...DEFAULT_CONFIG })
+    // A conflict means another window already changed the saved settings. Keep
+    // the conflict message and reload action instead of hiding the only recovery.
+    if (conflict) setError(tr('settings.conflict'))
+    else { setError(''); showToast(tr('settings.resetDone'), 'info', 2600) }
   }
 
-  return <div className="dsh-ia dsh-ia-settings-shell">
-    <form className="dsh-ia-settings" aria-label={tr('settings.title')} onSubmit={event => { void save(event) }}>
+  return <div ref={shellRef} className="dsh-ia dsh-ia-settings-shell">
+    <form className="dsh-ia-settings" aria-label={tr('settings.title')} noValidate onSubmit={event => { void save(event) }}>
       <header className="dsh-ia-settings-head">
         <div className="dsh-ia-settings-head-copy">
           <h2>{tr('settings.heading')}</h2>
           <p>{tr('settings.subtitle')}</p>
         </div>
-        {toast && <div className={`dsh-ia-settings-toast is-${toast.tone}`} role="status" aria-live="polite"><span className="dsh-ia-toast-icon" aria-hidden="true">{toast.tone === 'success' ? '✓' : 'i'}</span>{toast.text}</div>}
       </header>
       {loading && <p role="status">{tr('settings.loading')}</p>}
       <fieldset className="dsh-ia-settings-fieldset" disabled={loading || saving || generation === null || !accepted}>
@@ -305,6 +354,16 @@ export function AssistantSettings({ runtime }: SettingsProps) {
                 <option value="deep">{tr('settings.select.deep')}</option>
               </select>
             </Row>
+            <label className="dsh-ia-field dsh-ia-field-block">
+              <span className="dsh-ia-field-title">{tr('settings.preserveTerms')} <InfoTip text={tr('settings.hint.preserveTerms')} label={`${tr('common.help')}: ${tr('settings.preserveTerms')}`} /></span>
+              <textarea aria-label={tr('settings.preserveTerms')} value={form.preserveTerms} maxLength={1000} rows={2}
+                placeholder={tr('settings.preserveTermsPlaceholder')} disabled={!form.optimizeEnabled}
+                onChange={event => change('preserveTerms', event.target.value)} />
+              <small className={`dsh-ia-field-hint${preserveTermOverflow ? ' dsh-ia-field-warn' : ''}`}>
+                {tr('settings.preserveTermsCount', { count: Math.min(preserveTermCount, PRESERVE_TERMS_MAX), max: PRESERVE_TERMS_MAX })}
+              </small>
+              {preserveTermOverflow && <small className="dsh-ia-field-warn" role="alert">{tr('settings.preserveTermsOverflow', { max: PRESERVE_TERMS_MAX })}</small>}
+            </label>
           </div>
         </section>
 
@@ -338,20 +397,20 @@ export function AssistantSettings({ runtime }: SettingsProps) {
           </button>
           {advancedOpen && <div className="dsh-ia-rows">
             <Row helpLabel={tr('common.help')} title={tr('settings.context')} hint={tr('settings.hint.context')} hintLabel={tr('settings.context')}>
-              <input type="number" aria-label={tr('settings.context')} value={form.maxHistoryChars} min={1000} max={64000} step={1000}
-                onChange={event => change('maxHistoryChars', Number(event.target.value))} />
+              <input type="number" aria-label={tr('settings.context')} value={Number.isNaN(form.maxHistoryChars) ? '' : form.maxHistoryChars} min={1000} max={64000} step={1000}
+                onChange={event => change('maxHistoryChars', readNumberInput(event))} />
             </Row>
             <Row helpLabel={tr('common.help')} title={tr('settings.timeout')} hint={tr('settings.hint.timeout')} hintLabel={tr('settings.timeout')}>
-              <input type="number" aria-label={tr('settings.timeout')} value={Math.round(form.suggestionTimeoutMs / 1000)} min={5} max={60} step={1}
-                onChange={event => change('suggestionTimeoutMs', Number(event.target.value) * 1000)} />
+              <input type="number" aria-label={tr('settings.timeout')} value={Number.isNaN(form.suggestionTimeoutMs) ? '' : Math.round(form.suggestionTimeoutMs / 1000)} min={5} max={60} step={1}
+                onChange={event => { const seconds = readNumberInput(event); change('suggestionTimeoutMs', Number.isNaN(seconds) ? Number.NaN : seconds * 1000) }} />
             </Row>
             <Row helpLabel={tr('common.help')} title={tr('settings.hourly')} hint={tr('settings.hint.hourly')} hintLabel={tr('settings.hourly')}>
-              <input type="number" aria-label={tr('settings.hourly')} value={form.hourlyCallLimit} min={0} max={2000} step={10}
-                onChange={event => change('hourlyCallLimit', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
+              <input type="number" aria-label={tr('settings.hourly')} value={Number.isNaN(form.hourlyCallLimit) ? '' : form.hourlyCallLimit} min={0} max={2000} step={1} inputMode="numeric"
+                onChange={event => change('hourlyCallLimit', readNumberInput(event))} />
             </Row>
             <Row helpLabel={tr('common.help')} title={tr('settings.temperature')} hint={tr('settings.hint.temperature')} hintLabel={tr('settings.temperature')}>
               <input type="number" aria-label={tr('settings.temperature')} value={Number.isNaN(form.temperature) ? '' : form.temperature} min={0} max={2} step={0.1}
-                onChange={event => change('temperature', event.target.value === '' ? Number.NaN : Number(event.target.value))} />
+                onChange={event => change('temperature', readNumberInput(event))} />
             </Row>
             <label className="dsh-ia-field dsh-ia-field-block">
               <span className="dsh-ia-field-title">{tr('settings.extra')} <InfoTip text={tr('settings.hint.extra')} label={`${tr('common.help')}: ${tr('settings.extra')}`} /></span>
@@ -370,6 +429,7 @@ export function AssistantSettings({ runtime }: SettingsProps) {
         </div>
       </fieldset>
     </form>
+    {toast && createPortal(<div className="dsh-ia dsh-ia-settings-toast-layer"><div key={toast.id} ref={toastRef} className={`dsh-ia-settings-toast is-${toast.tone}`} role="status" aria-atomic="true" style={toastPosition ? { left: toastPosition.left, top: toastPosition.top } : { left: 0, top: 0, visibility: 'hidden' }}><span className="dsh-ia-toast-icon" aria-hidden="true">{toast.tone === 'success' ? '✓' : 'i'}</span><span>{toast.text}</span></div></div>, document.body)}
     <div className="dsh-ia-settings-footer">
       <button ref={aboutButtonRef} type="button" className="dsh-ia-link" onClick={() => setAboutOpen(true)}>{tr('settings.aboutLink')}<ChevronRight /></button>
     </div>

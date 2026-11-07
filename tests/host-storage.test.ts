@@ -60,12 +60,16 @@ describe('stored settings survive version drift', () => {
   })
 
   it('falls back per field for corrupted values while keeping the rest', async () => {
-    const f = seeded({ ...DEFAULT_CONFIG, debounceMs: 'oops', optimizeEnabled: 'yes', suggestionLength: 'huge', displayMode: 'panel' })
+    const f = seeded({ ...DEFAULT_CONFIG, debounceMs: 'oops', optimizeEnabled: 'yes', suggestionLength: 'huge',
+      nextEnabled: 'yes', completionEnabled: 1, hourlyCallLimit: -1, displayMode: 'panel' })
     const settings = await f.storage.settings()
     expect(settings.debounceMs).toBe(600)
     expect(settings.optimizeEnabled).toBe(true)
     expect(settings.suggestionLength).toBe('standard')
     expect(settings.displayMode).toBe('panel')
+    expect(settings.nextEnabled).toBe(false)
+    expect(settings.completionEnabled).toBe(false)
+    expect(settings.hourlyCallLimit).toBe(10)
   })
 
   it('keeps a complete auxiliary model pair across save and reload', async () => {

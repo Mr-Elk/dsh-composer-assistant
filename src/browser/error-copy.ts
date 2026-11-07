@@ -35,7 +35,13 @@ export function errorCopy(error: unknown, translate: Translate): string | null {
     case 'CONFIG_SUGGESTION_LENGTH': return translate('config.suggestionLength')
     case 'CONFIG_LANGUAGE': return translate('config.language')
     case 'CONFIG_STRENGTH': return translate('config.strength')
-    case 'CONFIG_NUMBER': return translate('config.number', { field, min: params.min ?? 0, max: params.max ?? 0 })
+    case 'CONFIG_NUMBER': {
+      // The UI edits suggestion timeout in seconds while the config stores ms.
+      const seconds = params.field === 'suggestionTimeoutMs'
+      const min = Number(params.min ?? 0) / (seconds ? 1000 : 1)
+      const max = Number(params.max ?? 0) / (seconds ? 1000 : 1)
+      return translate('config.number', { field, min, max })
+    }
     case 'CONFIG_STRING': return translate('config.string', { field, limit: params.limit ?? 0 })
     case 'CONFIG_TEMPERATURE': return translate('config.temperature')
     case 'CONFIG_MODEL_PAIR': return translate('config.modelPair')

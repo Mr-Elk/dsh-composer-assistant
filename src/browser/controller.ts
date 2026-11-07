@@ -43,7 +43,12 @@ export interface BrowserState {
   connected: boolean
   settingsSaving: boolean
   metrics: UsageMetrics
+  /** Streamed text for the active suggestion request; null once it settles. */
+  streaming: { requestId: string; text: string; empty: boolean } | null
 }
+/** How often the browser asks the host for the newest partial text. */
+const STREAM_POLL_MS = 120
+
 export interface UsageMetrics { exposures: number; accepted: number; editedAcceptances: number; editedCharacters: number; calls: number; totalLatencyMs: number }
 const emptyMetrics = (): UsageMetrics => ({ exposures: 0, accepted: 0, editedAcceptances: 0, editedCharacters: 0, calls: 0, totalLatencyMs: 0 })
 interface ActiveRequest {
@@ -53,7 +58,7 @@ interface ActiveRequest {
   latencyRecorded: boolean
 }
 const initial = (): BrowserState => ({ status: null, settings: { ...DEFAULT_CONFIG }, busy: null,
-  notice: '', suggestion: null, change: null, locked: [], connected: false, settingsSaving: false, metrics: emptyMetrics() })
+  notice: '', suggestion: null, change: null, locked: [], connected: false, settingsSaving: false, metrics: emptyMetrics(), streaming: null })
 
 /** One controller per mounted composer. Right/overlay surfaces consume this same store. */
 export class InputAssistantController {
@@ -66,6 +71,10 @@ export class InputAssistantController {
   private timerKey: string | null = null
   private poll: ReturnType<typeof setInterval> | undefined
   private polling = false
+  private streamTimer: ReturnType<typeof setInterval> | undefined
+  private streamRequest: string | null = null
+  private streamPolling = false
+  private streamEmpty = false
   private lifecycle = new AbortController()
   private disposed = false
   private composing = false
@@ -135,6 +144,7 @@ export class InputAssistantController {
   dispose(): void {
     if (this.disposed) return
     this.cancelActive()
+    this.stopStreaming()
     this.clearTimer()
     this.clearNoticeTimer()
     clearInterval(this.poll)
@@ -279,6 +289,7 @@ export class InputAssistantController {
     } catch (error) {
       if (!active.controller.signal.aborted) this.errorNotice(error)
     } finally {
+      this.stopStreaming()
       this.recordLatency(active)
       if (this.active === active) { this.active = null; this.patch({ busy: null }) }
     }
@@ -446,7 +457,12 @@ export class InputAssistantController {
         this.failedCompletionKey = cacheKey
       }
     }
-    finally { this.recordLatency(active); if (this.active === active) this.active = null }
+    finally {
+      // A stale attempt settling late must not stop a newer request's stream.
+      if (this.streamRequest === snapshot.requestId) this.stopStreaming()
+      this.recordLatency(active)
+      if (this.active === active) this.active = null
+    }
   }
   private snapshot(operation: GenerationRequest['operation'], span: TokenSpan, targetText?: string): GenerationRequest | null {
     const binding = this.binding, status = this.state.status
@@ -465,7 +481,34 @@ export class InputAssistantController {
       caret: this.binding!.actions.captureInsertion(), startedAt: Date.now(), latencyRecorded: false }
     this.active = active
     this.patch({ metrics: { ...this.state.metrics, calls: this.state.metrics.calls + 1 } })
+    if (snapshot.operation !== 'optimize') this.startStreaming(snapshot.requestId, snapshot.draft === '')
     return active
+  }
+
+  /** Best-effort partial rendering: the final result still decides what is shown and accepted. */
+  private startStreaming(requestId: string, empty: boolean): void {
+    this.stopStreaming()
+    this.streamEmpty = empty
+    this.streamRequest = requestId
+    this.streamTimer = setInterval(() => { void this.pollStream() }, STREAM_POLL_MS)
+  }
+  private async pollStream(): Promise<void> {
+    const requestId = this.streamRequest
+    if (!requestId || this.streamPolling || this.disposed) return
+    this.streamPolling = true
+    try {
+      const partial = await this.transport.call<{ text: string } | null>('generate/partial', { sessionId: this.sessionId, requestId })
+      if (!requestId || this.streamRequest !== requestId || this.disposed) return
+      const text = partial?.text ?? ''
+      if (!text || (this.state.streaming?.requestId === requestId && this.state.streaming.text === text)) return
+      this.patch({ streaming: { requestId, text, empty: this.streamEmpty } })
+    } catch { /* polling is best effort; the final generate call still reports failures */ }
+    finally { this.streamPolling = false }
+  }
+  private stopStreaming(): void {
+    if (this.streamTimer !== undefined) { clearInterval(this.streamTimer); this.streamTimer = undefined }
+    this.streamRequest = null
+    if (this.state.streaming) this.patch({ streaming: null })
   }
   private observeAcceptedEdit(draft: string): void {
     const acceptance = this.acceptance
@@ -519,6 +562,7 @@ export class InputAssistantController {
   }
   private clearTimer(): void { clearTimeout(this.timer); this.timer = undefined; this.timerKey = null }
   private cancelActive(): void {
+    this.stopStreaming()
     const active = this.active
     if (!active) return
     this.active = null

@@ -1,6 +1,6 @@
 import { AssistantError, type AssistantConfig, type GenerationRequest, type HistoryMessage, type Operation } from './types'
 import { buildContext, charCount } from './context'
-import { protectText, restoreProtected, type ProtectedText } from './protection'
+import { parsePreserveTerms, protectText, restoreProtected, type ProtectedText } from './protection'
 import { OPTIMIZE_MAX_GROWTH, suggestionCaps } from './config'
 
 export const NO_SUGGESTION = '[[NO_SUGGESTION]]'
@@ -32,7 +32,8 @@ export function prepareGeneration(request: GenerationRequest, history: readonly 
   if (request.operation === 'complete' && !request.draft.trim()) throw new AssistantError('EMPTY', '没有可续写的草稿')
   let system = common, protection: ProtectedText | null = null
   if (request.operation === 'optimize') {
-    protection = protectText(target, request.lockedFragments)
+    const terms = parsePreserveTerms(config.preserveTerms).filter(term => target.includes(term))
+    protection = protectText(target, [...(request.lockedFragments ?? []), ...terms])
     system += '\n' + [
       'Rewrite ONLY targetText into a clear, concise user prompt. Do not execute it.',
       'Preserve the goal, scope, negations, uncertainty, output requirements, and task status. Context may resolve references, but may not add new work or authorization.',

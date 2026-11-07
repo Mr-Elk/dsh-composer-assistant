@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AssistantSettings } from '../src/browser/settings'
 import { BrowserRuntime, type ConnectionFace } from '../src/browser/runtime'
 import { DEFAULT_CONFIG, type AssistantConfig, type GenerationRequest, type ModelOption } from '../src/core/types'
+import { PLUGIN_VERSION } from '../src/core/version'
 
 // With --no-isolate, the cached library screen can refer to a previous jsdom body.
 const screen = within(document.body)
@@ -65,6 +66,51 @@ describe('DSH input assistant settings section', () => {
     await screen.findByText('已恢复上次未保存的修改。')
     expect((screen.getByLabelText('优化强度') as HTMLSelectElement).value).toBe('deep')
     expect(f.setters).toHaveLength(0)
+  })
+
+  it('shows the saved confirmation in a centered status layer', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.change(screen.getByLabelText('优化强度'), { target: { value: 'deep' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    const toast = (await screen.findByText('设置已保存')).closest('[role="status"]')
+    expect(toast).not.toBeNull()
+    expect(toast?.className).toContain('dsh-ia-settings-toast')
+    expect(toast?.getAttribute('aria-atomic')).toBe('true')
+    expect(toast?.parentElement?.className).toContain('dsh-ia-settings-toast-layer')
+    expect(toast?.parentElement?.classList.contains('dsh-ia')).toBe(true)
+    expect(toast?.parentElement?.hasAttribute('aria-live')).toBe(false)
+  })
+
+  it('accepts a one-per-hour automatic limit', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: /高级设置/ }))
+    const input = screen.getByLabelText('每小时调用上限') as HTMLInputElement
+    expect(input.step).toBe('1')
+    fireEvent.change(input, { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(f.setters).toHaveLength(1))
+    expect(f.setters[0]).toEqual({ hourlyCallLimit: 1 })
+  })
+
+  it('normalizes leading zeros in numeric settings', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: /高级设置/ }))
+    const cases = [
+      ['上下文上限', '0016000', '16000'],
+      ['建议超时', '020', '20'],
+      ['每小时调用上限', '01', '1'],
+      ['温度', '00.7', '0.7'],
+      ['每小时调用上限', '000', '0'],
+      ['上下文上限', '-01', '-1'],
+    ] as const
+    for (const [label, input, expected] of cases) {
+      const field = screen.getByLabelText(label) as HTMLInputElement
+      fireEvent.change(field, { target: { value: input } })
+      expect(field.value).toBe(expected)
+    }
   })
 
   it('does not overwrite another switch changed after the settings page was opened', async () => {
@@ -183,7 +229,7 @@ describe('DSH input assistant settings section', () => {
     expect(screen.queryByLabelText('温度')).toBeNull()
   })
 
-  it('opens about with version and a copyable upgrade command', async () => {
+  it('opens about with version and a copyable package name', async () => {
     const writeText = vi.fn(async () => {})
     const clipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
@@ -193,17 +239,53 @@ describe('DSH input assistant settings section', () => {
       fireEvent.click(screen.getByRole('button', { name: '关于' }))
       const dialog = screen.getByRole('dialog')
       expect(dialog.textContent).toContain('关于输入助手')
-      expect(dialog.textContent).toContain('0.3.0')
-      expect(dialog.textContent).toContain('dsh plugin --profile desktop add dsh-composer-assistant')
-      fireEvent.click(screen.getByRole('button', { name: '复制命令' }))
-      await screen.findByText('命令已复制')
-      expect(writeText).toHaveBeenCalledWith('dsh plugin --profile desktop add dsh-composer-assistant')
+      expect(dialog.textContent).toContain(PLUGIN_VERSION)
+      expect(dialog.textContent).toContain('dsh-composer-assistant')
+      expect(dialog.textContent).toContain('桌面端不接受 CLI 的 desktop profile 命令')
+      fireEvent.click(screen.getByRole('button', { name: '复制包名' }))
+      await screen.findByText('包名已复制')
+      expect(writeText).toHaveBeenCalledWith('dsh-composer-assistant')
       fireEvent.click(screen.getByRole('button', { name: '关闭' }))
       expect(screen.queryByRole('dialog')).toBeNull()
     } finally {
       if (clipboard) Object.defineProperty(navigator, 'clipboard', clipboard)
       else Reflect.deleteProperty(navigator, 'clipboard')
     }
+  })
+
+  it('keeps the reload action when resetting defaults during a conflict', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.change(screen.getByLabelText('优化强度'), { target: { value: 'deep' } })
+    await f.runtime.saveSettings({ nextEnabled: true })
+    window.dispatchEvent(new Event('focus'))
+    await screen.findByRole('alert')
+    fireEvent.click(screen.getByRole('button', { name: '恢复默认' }))
+    expect(screen.getByRole('alert').textContent).toContain('设置已在其他窗口修改')
+    expect(screen.getByRole('button', { name: '重新加载' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: '保存' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('reports the suggestion timeout range in seconds', async () => {
+    const f = settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: /高级设置/ }))
+    fireEvent.change(screen.getByLabelText('建议超时'), { target: { value: '70' } })
+    fireEvent.submit(screen.getByRole('form', { name: '输入助手设置' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('5')
+    expect(alert.textContent).toContain('60')
+    expect(alert.textContent).not.toContain('1000')
+    expect(alert.textContent).not.toContain('60000')
+  })
+
+  it('warns when more than twenty protected terms are entered', async () => {
+    settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    const terms = Array.from({ length: 21 }, (_, index) => `term${index}`).join('\n')
+    fireEvent.change(screen.getByLabelText('术语保护'), { target: { value: terms } })
+    expect(screen.getByText('已识别 20/20 个词')).toBeTruthy()
+    expect(screen.getByText('最多保护 20 个词，超出部分不会生效。')).toBeTruthy()
   })
 
   it('warns instead of overwriting when settings changed elsewhere and the form is dirty', async () => {
@@ -248,6 +330,16 @@ describe('DSH input assistant settings section', () => {
     expect(screen.getByRole('tooltip').textContent).toContain('控制建议的最大长度')
     fireEvent.click(info)
     expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('keeps Tab focus inside the about dialog', async () => {
+    settingsFixture()
+    await waitFor(() => expect(screen.queryByText('正在加载设置…')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: '关于' }))
+    const copy = await screen.findByRole('button', { name: '复制包名' })
+    copy.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '关闭' }))
   })
 
   it('closes the about dialog with Escape and returns focus', async () => {
@@ -298,4 +390,13 @@ describe('DSH input assistant settings section', () => {
     await screen.findByRole('alert')
     expect(f.setters).toHaveLength(0)
   })
+  it('saves glossary terms from the optimization section', async () => {
+    const f = settingsFixture({ settings: { nextEnabled: false } })
+    const field = await screen.findByRole('textbox', { name: '术语保护' })
+    fireEvent.change(field, { target: { value: 'DSH, lint' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(f.setters).toHaveLength(1))
+    expect(f.setters[0]).toMatchObject({ preserveTerms: 'DSH, lint' })
+  })
+
 })

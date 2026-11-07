@@ -26,6 +26,15 @@ for (let offset = 0; offset + 512 <= tar.length;) {
 for (const path of ['package/package.json', 'package/cordis.patch.yml', 'package/lib/index.js', 'package/lib/index.d.ts', 'package/lib/client.js', 'package/lib/core.js', 'package/README.md', 'package/README.en.md', 'package/LICENSE']) assert.ok(entries.has(path), `Missing ${path}`)
 assert.ok(![...entries.keys()].some(path => /node_modules|\.research|evaluation\/cases/.test(path)), 'Research/runtime/evaluation fixtures must not ship')
 
+// Compare the packed output with this build, so an older same-version archive
+// cannot pass just because its entry points still load.
+for (const [path, bytes] of entries) {
+  const local = path.replace(/^package\//u, '')
+  if (local.startsWith('lib/') || ['README.md', 'README.en.md', 'LICENSE', 'cordis.patch.yml'].includes(local) || local.startsWith('docs/')) {
+    assert.ok(bytes.equals(await readFile(local)), `Packed file differs from this build: ${local}`)
+  }
+}
+
 const pkg = JSON.parse(entries.get('package/package.json').toString('utf8'))
 assert.equal(pkg.name, manifest.name)
 assert.equal(pkg.version, manifest.version)
@@ -52,8 +61,18 @@ try {
   const host = await import(pathToFileURL(join(root, 'lib/index.js')).href)
   assert.equal(typeof host.apply, 'function')
   assert.equal(typeof host.name, 'string')
+  const core = await import(pathToFileURL(join(root, 'lib/core.js')).href)
+  assert.equal(core.PLUGIN_VERSION, manifest.version)
+  assert.equal(core.DEFAULT_CONFIG.optimizeEnabled, true)
+  assert.equal(core.DEFAULT_CONFIG.nextEnabled, false)
+  assert.equal(core.DEFAULT_CONFIG.completionEnabled, false)
+  assert.equal(core.DEFAULT_CONFIG.hourlyCallLimit, 10)
+  const defaults = host.Config({})
+  assert.equal(defaults.nextEnabled, false)
+  assert.equal(defaults.completionEnabled, false)
+  assert.equal(defaults.hourlyCallLimit, 10)
 } finally {
   await rm(root, { recursive: true, force: true })
 }
 
-process.stdout.write(`PASS ${archive}: required files, version, isolated DSH client factory, host import from archive.\n`)
+process.stdout.write(`PASS ${archive}: required files, version, current build bytes, isolated DSH client factory, host/core import and opt-in defaults from archive.\n`)

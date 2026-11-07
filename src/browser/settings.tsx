@@ -49,6 +49,23 @@ function Row({ title, hint, hintLabel, helpLabel, disabled, children }: {
   </div>
 }
 
+/**
+ * The settings shell is only the right-hand content column. The save toast is a
+ * page-level notification, so use the enclosing settings surface (the host dialog
+ * when it exposes one) for horizontal centering instead of the content column.
+ */
+function settingsSurface(shell: HTMLElement): HTMLElement {
+  let node = shell.parentElement
+  let surface = shell
+  while (node && node !== document.body) {
+    if (node.getAttribute('role') === 'dialog' || node.getAttribute('aria-modal') === 'true') return node
+    const rect = node.getBoundingClientRect()
+    if (rect.width > 0 && rect.width <= window.innerWidth * 0.98) surface = node
+    node = node.parentElement
+  }
+  return surface
+}
+
 function AboutDialog({ open, onClose, translate }: {
   open: boolean; onClose: () => void; translate: Translate
 }) {
@@ -107,22 +124,24 @@ export function AssistantSettings({ runtime }: SettingsProps) {
     return () => clearTimeout(timer)
   }, [toast])
 
-  // Center inside the settings surface's visible area, then move to the nearest
-  // gap if the compact pill would cover an input, select or textarea.
+  // Center on the whole settings surface, then pin the pill near its top edge.
+  // The content shell is narrower than the dialog and would make the toast look
+  // off-center next to the left navigation. Keep the existing control-overlap
+  // fallback for short windows.
   useLayoutEffect(() => {
     if (!toast) { setToastPosition(null); return }
     const shell = shellRef.current, node = toastRef.current
     if (!shell || !node) return
-    const shellRect = shell.getBoundingClientRect()
-    const left = Math.max(0, shellRect.left)
-    const top = Math.max(0, shellRect.top)
-    const right = Math.min(window.innerWidth, shellRect.right)
-    const bottom = Math.min(window.innerHeight, shellRect.bottom)
+    const surface = settingsSurface(shell)
+    const surfaceRect = surface.getBoundingClientRect()
+    const left = Math.max(0, surfaceRect.left)
+    const top = Math.max(0, surfaceRect.top)
+    const right = Math.min(window.innerWidth, surfaceRect.right)
+    const bottom = Math.min(window.innerHeight, surfaceRect.bottom)
     if (right <= left || bottom <= top) return
     const rect = node.getBoundingClientRect()
     const width = rect.width, height = rect.height
     const centerX = (left + right) / 2
-    const centerY = (top + bottom) / 2
     const controls = [...shell.querySelectorAll<HTMLElement>('input, select, textarea')]
     const overlaps = (candidateTop: number) => controls.some(control => {
       const r = control.getBoundingClientRect()
@@ -132,10 +151,11 @@ export function AssistantSettings({ runtime }: SettingsProps) {
     })
     const minTop = top + 8
     const maxTop = Math.max(minTop, bottom - height - 8)
-    const base = centerY - height / 2
+    const preferredTop = top + Math.min(64, Math.max(8, (bottom - top) * 0.12))
+    const base = Math.min(Math.max(preferredTop - height / 2, minTop), maxTop)
     const offsets = [0]
     for (let step = 1; step <= 4; step += 1) offsets.push(-step * (height + 12), step * (height + 12))
-    let chosen = Math.min(Math.max(base, minTop), maxTop)
+    let chosen = base
     for (const offset of offsets) {
       const candidate = Math.min(Math.max(base + offset, minTop), maxTop)
       if (!overlaps(candidate)) { chosen = candidate; break }

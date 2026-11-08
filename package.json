@@ -1,13 +1,18 @@
 {
   "name": "dsh-composer-assistant",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "DSH 输入助手：下一句预测、输入续写、提示词优化（dsh-input-assistant 的增强 fork）",
   "type": "module",
   "license": "MIT",
   "author": "dsh-input-assistant contributors (fork)",
-  "repository": { "type": "git", "url": "git+https://github.com/Mr-Elk/dsh-composer-assistant.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mr-Elk/dsh-composer-assistant.git"
+  },
   "homepage": "https://github.com/Mr-Elk/dsh-composer-assistant#readme",
-  "bugs": { "url": "https://github.com/Mr-Elk/dsh-composer-assistant/issues" },
+  "bugs": {
+    "url": "https://github.com/Mr-Elk/dsh-composer-assistant/issues"
+  },
   "keywords": [
     "dsh",
     "deepseek-harness",

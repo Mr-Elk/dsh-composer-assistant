@@ -4,7 +4,7 @@
 
 Predict the next message, continue a draft, or polish a prompt in the DeepSeek Harness (DSH) composer. The plugin offers editable text only: press `Tab` to accept or `Esc` to dismiss. It never sends a message for you.
 
-Current npm release: `0.4.0`; previous release: `0.3.0`. GitHub Release `v0.4.0` is now final.
+Current npm release: `0.4.1` (documentation-only; code is identical to `0.4.0`); previous release: `0.3.0`.
 
 ## What changed in 0.4.0
 

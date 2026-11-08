@@ -2,6 +2,13 @@
 
 本文件记录面向用户的变更。完整的技术修正记录见 [`docs/CHANGELOG-0.1.2.md`](docs/CHANGELOG-0.1.2.md)。英文摘要见 [`CHANGELOG.en.md`](CHANGELOG.en.md)。
 
+## [0.4.1] - 2026-11-08
+
+仅修正 npm 页面上的说明文字，代码与 `0.4.0` 相同。
+
+- npm 包内 README 更新为“`0.4.0` 已发布”，不再写“npm 仍是 `0.3.0` / GitHub 预发布”。
+- 同步 `package.json` 与 `PLUGIN_VERSION`，便于在插件页区分安装版本。
+
 ## [0.4.0] - 2026-11-07
 
 GitHub 正式版与 npm `0.4.0` 已发布（2026-11-07 预发布，2026-11-08 转正式版）。

@@ -2,6 +2,13 @@
 
 This is the English summary. The Chinese [CHANGELOG.md](CHANGELOG.md) remains the detailed record.
 
+## [0.4.1] - 2026-11-08
+
+Documentation-only release; the code is identical to `0.4.0`.
+
+- The npm README now states that `0.4.0` is published instead of saying npm still serves `0.3.0`.
+- `package.json` and `PLUGIN_VERSION` are bumped so the plugin page shows the installed version.
+
 ## [0.4.0] - 2026-11-07
 
 Published as a GitHub release and npm `0.4.0` (pre-release on 2026-11-07, final on 2026-11-08).
